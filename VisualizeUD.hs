@@ -187,12 +187,8 @@ toSVG = concatMap toSVG1
                        ("viewBox",unwords (map show [0,0,x1,y0+5])),
                        ("version","1.1"),
                        ("xmlns","http://www.w3.org/2000/svg")]
-                       (white_bg:concatMap draw cmds)]
+                       (concatMap draw cmds)]
           where
-            white_bg =
-              Elem "rect" ["x".=0,"y".=0,"width".=x1,"height".=y0+5,
-                           ("fill","white")] []
-
             draw (Put pos obj) = objectSVG pos obj
 
             objectSVG pos obj =
