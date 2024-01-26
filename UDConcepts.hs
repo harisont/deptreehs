@@ -51,7 +51,7 @@ type Label = String
 instance Read UDWord where
   readsPrec _ s = [(prs s :: UDWord, "")]
 
--- useless because one could just use isSubRTree, but...
+-- useless because one could just use isSubtree, but...
 isSubUDTree :: UDTree -> UDTree -> Bool
 isSubUDTree t u = t == u || any (isSubUDTree t) (subtrees u)
 
@@ -249,7 +249,7 @@ udSentence2tree s = s2t rootWord where
 udTree2sentence :: UDTree -> UDSentence
 udTree2sentence t = UDSentence {
   udCommentLines = [],
-  udWordLines = sortOn udID (allNodesRTree t)
+  udWordLines = sortOn udID (allNodes t)
   }
 
 -- return the id of a sentence, taken from the comment that precedes it
@@ -261,11 +261,11 @@ sentId s = if hasSentId s then head $ words $ head idEtc else error "missing sen
 
 
 prUDTree :: UDTree -> String
-prUDTree = prLinesRTree prt
+prUDTree = prIndented prt
 
 -- "prints" the "linearized" UD tree 
 prUDTreeString :: UDTree -> String
-prUDTreeString t = unwords [udFORM n | n <- sortOn udID (allNodesRTree t)]
+prUDTreeString t = unwords [udFORM n | n <- sortOn udID (allNodes t)]
 
 --------------------
 -- checking for permissible values
@@ -327,7 +327,7 @@ adjustRootAndPositions = udSentence2tree . adjustUDIds . udTree2sentence . creat
 isProjective :: UDTree -> Bool
 isProjective udt = length nodes - 1 == maxId - minId
  where
-   nodes = map (udPosition . udID) (allNodesRTree udt)
+   nodes = map (udPosition . udID) (allNodes udt)
    maxId = maximum nodes
    minId = minimum nodes
 

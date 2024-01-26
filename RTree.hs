@@ -1,45 +1,51 @@
 module RTree where
     
--- rose tree
+-- | [Rose](https://en.wikipedia.org/wiki/Rose_tree) (recursive) tree
 data RTree a = RTree {
-  root   :: a,
-  subtrees :: [RTree a] 
-  }
-  deriving (Eq,Show,Read)
+  root :: a,              -- ^ root node
+  subtrees :: [RTree a]   -- ^ list of subtrees
+  } deriving (Eq,Show,Read)
 
-mapRTree :: (a -> b) -> RTree a -> RTree b
-mapRTree f (RTree c ts) = RTree (f c) (map (mapRTree f) ts)
+-- | Returns the leaf nodes of a 'RTree'
+leaves :: RTree a -> [a]
+leaves t = case t of
+  RTree a [] -> [a]
+  RTree a ts -> concatMap leaves ts
 
-allNodesRTree :: RTree a -> [a]
-allNodesRTree t = root t : concatMap allNodesRTree (subtrees t)
+-- | Returns a list of all of a 'RTree''s subtrees (recursively extracted)
+allSubtrees :: RTree a -> [RTree a]
+allSubtrees t = t : concatMap allSubtrees (subtrees t)
 
-prLinesRTree :: (a -> String) -> RTree a -> String
-prLinesRTree prt = unlines . pr 0 where
+-- | Returns a list of all nodes that make up a 'RTree'
+allNodes :: RTree a -> [a]
+allNodes t = root t : concatMap allNodes (subtrees t)
+
+-- | Returns the number of nodes of a 'RTree'
+size :: RTree a -> Int
+size = length . allNodes
+
+-- | Returns the depth of a 'RTree'
+depth :: RTree a -> Int
+depth (RTree _ []) = 1  
+depth (RTree _ ts) = 1 + maximum (map depth ts)  
+
+-- | Given two 'RTree's, it checks whether the first one is a subtree of the
+-- second one 
+isSubtree :: Eq a => RTree a -> RTree a -> Bool
+isSubtree t u = t == u || any (isSubtree t) (subtrees u)
+
+-- | 'map' for 'RTree'
+rtmap :: (a -> b) -> RTree a -> RTree b
+rtmap r (RTree h ts) = RTree (r h) (map (rtmap r) ts)
+
+-- | Returns the indented string representation of a 'RTree'
+prIndented :: (a -> String) -> RTree a -> String
+prIndented prt = unlines . pr 0 where
   pr i t = indent i (prt (root t)) : concatMap (pr (i+4)) (subtrees t)
   indent i s = replicate i ' ' ++ s
 
-prRTree :: (a -> String) -> RTree a -> String
-prRTree pr t = case t of
+-- | Returns the bracketed string representation of a 'RTree'
+prBracketed :: (a -> String) -> RTree a -> String
+prBracketed pr t = case t of
   RTree a [] -> pr a
-  RTree a ts -> "(" ++ pr a ++ " " ++ unwords (map (prRTree pr) ts) ++ ")"
-
-isSubRTree :: Eq a => RTree a -> RTree a -> Bool
-isSubRTree t u = t == u || any (isSubRTree t) (subtrees u)
-
-sizeRTree :: RTree a -> Int
-sizeRTree = length . allNodesRTree
-
-depthRTree :: RTree a -> Int
-depthRTree (RTree _ []) = 1  
-depthRTree (RTree _ ts) = 1 + maximum (map depthRTree ts)  
-
-leavesRTree :: RTree a -> [a]
-leavesRTree t = case t of
-  RTree a [] -> [a]
-  RTree a ts -> concatMap leavesRTree ts
-
-childrenRTree :: RTree a -> [RTree a]
-childrenRTree (RTree _ ts) = ts
-
-allSubRTrees :: RTree a -> [RTree a]
-allSubRTrees t = t : concatMap allSubRTrees (childrenRTree t)
+  RTree a ts -> "(" ++ pr a ++ " " ++ unwords (map (prBracketed pr) ts) ++ ")"

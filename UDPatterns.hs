@@ -98,12 +98,12 @@ ifMatchUDPattern patt tree@(RTree node subtrees) = case patt of
   TRUE -> True
   PROJECTIVE -> isProjective tree
   ARG pos deprel -> ifMatchUDPattern (AND [POS pos, DEPREL deprel]) tree
-  DEPTH d -> depthRTree tree == d
-  DEPTH_UNDER d -> depthRTree tree < d
-  DEPTH_OVER d -> depthRTree tree > d
-  LENGTH d -> length (allNodesRTree tree) == d
-  LENGTH_UNDER d -> length (allNodesRTree tree) < d
-  LENGTH_OVER d -> length (allNodesRTree tree) > d
+  DEPTH d -> depth tree == d
+  DEPTH_UNDER d -> depth tree < d
+  DEPTH_OVER d -> depth tree > d
+  LENGTH d -> length (allNodes tree) == d
+  LENGTH_UNDER d -> length (allNodes tree) < d
+  LENGTH_OVER d -> length (allNodes tree) > d
 
 matchString p s = case p of
   '*':pp -> pp == drop (length s - length pp) s
@@ -206,12 +206,12 @@ flattenRTree d tr@(RTree node subtrs) = case d of
 
 smallestSpanningUDSubtree :: Int -> Int -> UDTree -> Maybe UDTree
 smallestSpanningUDSubtree begin end tree = case tree of
-  _ | sizeRTree tree < 1 + end - begin -> Nothing
+  _ | size tree < 1 + end - begin -> Nothing
   _ -> case [t | t <- subtrees tree, covers t] of
     t:_ -> smallestSpanningUDSubtree begin end t -- t is unique, since each node occurs once
     _ -> Just tree -- must cover due to the size condition
  where
-   covers t = all (\n -> elem n [udPosition (udID w) | w <- allNodesRTree t]) [begin..end]
+   covers t = all (\n -> elem n [udPosition (udID w) | w <- allNodes t]) [begin..end]
 
 
 --------------------------------------------------

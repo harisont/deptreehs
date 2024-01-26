@@ -24,7 +24,7 @@ udFrequencyMap :: Opts -> [UDSentence] -> M.Map [String] Int
 udFrequencyMap opts sents
    | isOpt opts "SUBTREETYPE" = M.fromList [([prUDType ut],n) | (ut,n) <- M.assocs (udTypeFrequencyMap sents)]
    | isOpt opts "LENGTH" = frequencyMap $ map (return . show . length . udWordLines) sents
-   | isOpt opts "DEPTH" = frequencyMap $ map (return . show . depthRTree . udSentence2tree) sents
+   | isOpt opts "DEPTH" = frequencyMap $ map (return . show . depth . udSentence2tree) sents
    | otherwise = frequencyMap $ map f $ allWords
   where
     f = \w -> [fun w | (opt,fun) <- optfuns, isOpt opts opt]
