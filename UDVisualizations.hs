@@ -1,7 +1,7 @@
 -- Based on 
 -- https://github.com/aarneranta/deptreepy/blob/main/utils/VisualizeUD.hs
 
-module VisualizeUD where
+module UDVisualizations where
 import Prelude hiding ((<>)) -- GHC 8.4.1 clash with Text.PrettyPrint
 import qualified Data.Map as Map
 import Data.List (intersperse,nub,mapAccumL,find,groupBy,sortBy,partition)
