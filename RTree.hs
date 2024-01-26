@@ -12,13 +12,13 @@ leaves t = case t of
   RTree a [] -> [a]
   RTree a ts -> concatMap leaves ts
 
--- | Returns a list of all of a 'RTree''s subtrees (recursively extracted)
-allSubtrees :: RTree a -> [RTree a]
-allSubtrees t = t : concatMap allSubtrees (subtrees t)
-
 -- | Returns a list of all nodes that make up a 'RTree'
 allNodes :: RTree a -> [a]
 allNodes t = root t : concatMap allNodes (subtrees t)
+
+-- | Returns a list of all of a 'RTree''s subtrees (recursively extracted)
+allSubtrees :: RTree a -> [RTree a]
+allSubtrees t = t : concatMap allSubtrees (subtrees t)
 
 -- | Returns the number of nodes of a 'RTree'
 size :: RTree a -> Int
