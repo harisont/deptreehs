@@ -24,7 +24,7 @@ udFrequencyMap :: Opts -> [UDSentence] -> M.Map [String] Int
 udFrequencyMap opts sents
    | isOpt opts "SUBTREETYPE" = M.fromList [([prUDType ut],n) | (ut,n) <- M.assocs (udTypeFrequencyMap sents)]
    | isOpt opts "LENGTH" = frequencyMap $ map (return . show . length . udWordLines) sents
-   | isOpt opts "DEPTH" = frequencyMap $ map (return . show . depth . udSentence2tree) sents
+   | isOpt opts "DEPTH" = frequencyMap $ map (return . show . depth . sentence2tree) sents
    | otherwise = frequencyMap $ map f $ allWords
   where
     f = \w -> [fun w | (opt,fun) <- optfuns, isOpt opts opt]
@@ -63,14 +63,14 @@ udTypeFrequencyMap ss =
     frequencyMap nexx
   where
     nexx = [normalizeUDType ty  | (ty,_) <- exx]
-    exx = concatMap (typesInUDTree . udSentence2tree) ss
+    exx = concatMap (typesInUDTree . sentence2tree) ss
 
 udTypeFrequencies :: [UDSentence] -> [(UDType,(Int,String))]
 udTypeFrequencies ss =
     frequencyExampleList nexx
   where
     nexx = [(normalizeUDType ty, ex)  | (ty,ex) <- exx]
-    exx = concatMap (typesInUDTree . udSentence2tree) ss
+    exx = concatMap (typesInUDTree . sentence2tree) ss
 
 data UDType = UDType {
   udVal  :: (UPOS,(Label,[UDData])),

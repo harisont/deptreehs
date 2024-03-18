@@ -17,11 +17,11 @@ showMatchesInUDSentence opts p s =
   if   null matches then ""
   else unlines (udCommentLines s ++ matches)
  where
-   matches = [prt (adjust t) | t <- matchesUDPattern p (udSentence2tree s)]
+   matches = [prt (adjust t) | t <- matchesUDPattern p (sentence2tree s)]
    adjust
-     | isOpt opts "adjust" = adjustUDIds . udTree2sentence . createRoot
-     | isOpt opts "prune" = udTree2sentence . (\t -> t{subtrees = []})
-     | otherwise = udTree2sentence
+     | isOpt opts "adjust" = adjustUDIds . tree2sentence . createRoot
+     | isOpt opts "prune" = tree2sentence . (\t -> t{subtrees = []})
+     | otherwise = tree2sentence
 
 matchesUDPattern :: UDPattern -> UDTree -> [UDTree]
 matchesUDPattern p tree@(RTree node subtrees) = case p of
@@ -36,8 +36,8 @@ showReplacementsInUDSentence rep s =
     if changed then ["# newtext = " ++ unwords (map udFORM (udWordLines ns))] else []
     })
  where
-   ns = adjustUDIds $ udTree2sentence $ createRoot tr
-   (tr,changed) = replacementsWithUDPattern rep (udSentence2tree s)
+   ns = adjustUDIds $ tree2sentence $ createRoot tr
+   (tr,changed) = replacementsWithUDPattern rep (sentence2tree s)
 
 replacementsWithUDPattern :: UDReplacement -> UDTree -> (UDTree,Bool)
 replacementsWithUDPattern rep tree = case replaceWithUDPattern rep tree of
@@ -122,7 +122,7 @@ findMatchingUDSequence strict ps tree
          snodes:_ -> smallestSpanningUDSubtree (begin snodes) (end snodes) tree
          _ -> Nothing
  where
-  nodes = udWordLines (udTree2sentence tree)
+  nodes = udWordLines (tree2sentence tree)
   parts = if strict then segments else sublists
   begin ns = udPosition (udID (head ns)) -- exists because ps > 0
   end ns = udPosition (udID (last ns))

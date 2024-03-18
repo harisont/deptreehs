@@ -80,18 +80,21 @@ data UDData = UDData {
 -- * 'UDSentence' - 'UDTree' conversions
 
 -- | Convert a 'UDSentence' into a 'UDTree'
-udSentence2tree :: UDSentence -> UDTree
-udSentence2tree s = s2t rootWord where
+sentence2tree :: UDSentence -> UDTree
+sentence2tree s = s2t rootWord where
   s2t hd = RTree hd [s2t w | w <- ws, udHEAD w == udID hd]
   rootWord =
     case [w | w <- ws, udHEAD w == rootID] of -- unique if check succeeds
       x:_ -> x
-      []  -> error $ "udSentence2tree: root word expected to have " ++ show rootID ++ " as root, got instead\n" ++ (prUDSentence 1 (UDSentence [] ws))
+      []  -> error $ 
+              "sentence2tree: root word expected to have " 
+              ++ show rootID ++ " as root, got instead\n" 
+              ++ (prUDSentence 1 (UDSentence [] ws))
   ws = udWordLines s
 
 -- | Convert a 'UDTree' into a 'UDSentence' 
-udTree2sentence :: UDTree -> UDSentence
-udTree2sentence t = UDSentence {
+tree2sentence :: UDTree -> UDSentence
+tree2sentence t = UDSentence {
   udCommentLines = [],
   udWordLines = sortOn udID (allNodes t)
   }
@@ -349,7 +352,7 @@ createRoot tree = tree {
 }
 
 adjustRootAndPositions :: UDTree -> UDTree
-adjustRootAndPositions = udSentence2tree . adjustUDIds . udTree2sentence . createRoot
+adjustRootAndPositions = sentence2tree . adjustUDIds . tree2sentence . createRoot
 
 isProjective :: UDTree -> Bool
 isProjective udt = length nodes - 1 == maxId - minId
