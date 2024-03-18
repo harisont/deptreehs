@@ -47,7 +47,7 @@ replacementsWithUDPattern rep tree = case replaceWithUDPattern rep tree of
 data UDPattern =
     FORM String
   | LEMMA String
-  | POS String
+  | UPOS String
   | XPOS String
   | MISC String String
   | FEATS String  -- feature list matches exactly
@@ -76,7 +76,7 @@ ifMatchUDPattern :: UDPattern -> UDTree -> Bool
 ifMatchUDPattern patt tree@(RTree node subtrees) = case patt of
   FORM s -> matchString s (udFORM node)
   LEMMA s -> matchString s (udLEMMA node)
-  POS s -> matchString s (udUPOS node)
+  UPOS s -> matchString s (udUPOS node)
   XPOS s -> matchString s (udXPOS node)
   MISC name s -> maybe False (matchString s) $ listToMaybe [ intercalate "," vals | UDData arg vals <- udMISC node , arg == name  ]
   FEATS udds -> udFEATS node == prs udds
@@ -97,7 +97,7 @@ ifMatchUDPattern patt tree@(RTree node subtrees) = case patt of
     or [ifMatchUDPattern (TREE p ps) (RTree node qs) | qs <- sublists (length ps) subtrees]
   TRUE -> True
   PROJECTIVE -> isProjective tree
-  ARG pos deprel -> ifMatchUDPattern (AND [POS pos, DEPREL deprel]) tree
+  ARG pos deprel -> ifMatchUDPattern (AND [UPOS pos, DEPREL deprel]) tree
   DEPTH d -> depth tree == d
   DEPTH_UNDER d -> depth tree < d
   DEPTH_OVER d -> depth tree > d
@@ -153,7 +153,7 @@ replaceWithUDPattern :: UDReplacement -> UDTree -> (UDTree,Bool)
 replaceWithUDPattern rep tree@(RTree node subtrs) = case rep of
   REPLACE_FORM old new | ifMatchUDPattern (FORM old) tree -> true $ tree{root = node{udFORM = new}}
   REPLACE_LEMMA old new | ifMatchUDPattern (LEMMA old) tree -> true $ tree{root = node{udLEMMA = new}}
-  REPLACE_POS old new | ifMatchUDPattern (POS old) tree -> true $ tree{root = node{udUPOS = new}}
+  REPLACE_POS old new | ifMatchUDPattern (UPOS old) tree -> true $ tree{root = node{udUPOS = new}}
   REPLACE_XPOS old new | ifMatchUDPattern (XPOS old) tree -> true $ tree{root = node{udXPOS = new}}
   REPLACE_MISC name old new | ifMatchUDPattern (MISC name old) tree -> true $ tree{root = node{udMISC = map (\ud -> if udArg ud == name then ud{udVals = getSeps ',' new} else ud) (udMISC node)}}
   REPLACE_DEPREL old new | ifMatchUDPattern (DEPREL old) tree -> true $ tree{root = node{udDEPREL = new}}

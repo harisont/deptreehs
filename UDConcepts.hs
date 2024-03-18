@@ -1,3 +1,15 @@
+{-|
+Module      : UDConcepts
+Description : Basic Universal Dependencies concepts
+License     : BSD-2
+Maintainer  : arianna.masciolini@gu.se
+Stability   : experimental
+Portability : POSIX
+
+Basic Universal Dependencies concepts, as defined in the CoNNL-U format 
+specification at [universaldependencies.org](universaldependencies.org).
+-}
+
 {-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
 
 module UDConcepts where
@@ -16,40 +28,88 @@ import Data.Char
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty (NonEmpty((:|)), (<|))
 
--- text paragraph representing the tree of a sentence
+-- * Basic data types
+
+-- | UD sentence as sequence of word tokens
 data UDSentence = UDSentence {
-  udCommentLines :: [String], -- all comments start with '#'
-  udWordLines    :: [UDWord]
+  udCommentLines :: [String], -- ^ comment lines
+  udWordLines    :: [UDWord]  -- ^ word tokens
   }
 
-data UDId =
-    UDIdInt Int
-  | UDIdRange Int Int
-  | UDIdEmpty Float -- "may be a decimal number for empty nodes (lower than 1 but greater than 0)"
-  | UDIdNone -- _
-   deriving (Eq,Ord,Show)
+-- | Tree represenation of a UD sentence. A UD tree is a 'RTree' whose nodes
+-- are 'UDWord's
+type UDTree = RTree UDWord
 
-udIdRoot = UDIdInt 0
-
--- tab-separated text line describing a word
+-- | UD word token, corresponding to the tab-separated text line describing a
+-- token in a CoNNL-U file
 data UDWord = UDWord {
-  udID     :: UDId,     -- word position
-  udFORM   :: String,   -- surface form
-  udLEMMA  :: String,   -- 
-  udUPOS   :: POS,      --
-  udXPOS   :: String,   -- language-specific pos tag, can be _
-  udFEATS  :: [UDData], -- morphological features
-  udHEAD   :: UDId,     -- the head of this word
-  udDEPREL :: Label,    -- the label of this word
-  udDEPS   :: String,   -- "Enhanced dependency graph in the form of a list of head-deprel pairs"
-  udMISC   :: [UDData]  -- "any other annotation"
+  udID     :: UDId,     -- ^ ID (word position, counting form 1)
+  udFORM   :: String,   -- ^ surface word form
+  udLEMMA  :: String,   -- ^ lemma
+  udUPOS   :: UPOS,      -- ^ Universal Part Of Speech tag
+  udXPOS   :: String,   -- ^ language-specific POS tag
+  udFEATS  :: [UDData], -- ^ morphological features
+  udHEAD   :: UDId,     -- ^ ID of the syntactic head of the token
+  udDEPREL :: Label,    -- ^ dependency label
+  udDEPS   :: String,   -- ^ enhanced dependency graph
+  udMISC   :: [UDData]  -- ^ any other annotation
   } deriving (Show,Eq,Ord)
-
-type POS = String
-type Label = String
 
 instance Read UDWord where
   readsPrec _ s = [(prs s :: UDWord, "")]
+
+-- | Token ID
+data UDId =
+    UDIdInt Int         -- ^ normal case: the ID is an integer
+  | UDIdRange Int Int   -- ^ multiword (e.g. "don't"): the ID is a range X-Y
+  | UDIdEmpty Float     -- ^ empty node: the ID is a float > 0  
+  | UDIdNone            -- ^ missing ID (_)
+   deriving (Eq,Ord,Show)
+
+type UPOS = String
+type Label = String
+
+-- | Representation of the key-values pairs used in the 'FEATS' and 'MISC' 
+-- fields with the (syntax: @Arg1=Val1,Val2,Val3@)
+data UDData = UDData {
+  udArg  :: String, -- ^ argument name
+  udVals ::[String] -- ^ values
+  }
+   deriving (Eq,Show,Ord)
+
+-- * 'UDSentence' - 'UDTree' conversions
+
+-- | Convert a 'UDSentence' into a 'UDTree'
+udSentence2tree :: UDSentence -> UDTree
+udSentence2tree s = s2t rootWord where
+  s2t hd = RTree hd [s2t w | w <- ws, udHEAD w == udID hd]
+  rootWord =
+    case [w | w <- ws, udHEAD w == rootID] of -- unique if check succeeds
+      x:_ -> x
+      []  -> error $ "udSentence2tree: root word expected to have " ++ show rootID ++ " as root, got instead\n" ++ (prUDSentence 1 (UDSentence [] ws))
+  ws = udWordLines s
+
+-- | Convert a 'UDTree' into a 'UDSentence' 
+udTree2sentence :: UDTree -> UDSentence
+udTree2sentence t = UDSentence {
+  udCommentLines = [],
+  udWordLines = sortOn udID (allNodes t)
+  }
+
+-- * Parsing functions
+
+-- | Parse a CoNNL-U file as a 'UDSentence'
+parseUDFile :: FilePath -> IO [UDSentence]
+parseUDFile f = readFile f >>= return . parseUDText
+
+-- | Parse a CoNNL-U string as a 'UDSentence'
+parseUDText :: String -> [UDSentence]
+parseUDText = map prss . stanzas . filter (not . isGeneralComment) . lines
+  where isGeneralComment line = "##" `isPrefixOf` line
+
+-- | The ID of the root of a UD tree is always 0
+rootID :: UDId
+rootID = UDIdInt 0
 
 -- useless because one could just use isSubtree, but...
 isSubUDTree :: UDTree -> UDTree -> Bool
@@ -60,11 +120,6 @@ isSubUDTree t u = t == u || any (isSubUDTree t) (subtrees u)
 isSubUDTree' :: UDTree -> UDTree -> Bool
 isSubUDTree' t u = t =~ u || any (isSubUDTree' t) (subtrees u)
 
-data UDData = UDData {
-  udArg  :: String,
-  udVals ::[String]
-  } -- Arg=Val,Val,Val
-   deriving (Eq,Show,Ord)
 
 initUDWord :: Int -> UDWord
 initUDWord i = UDWord (UDIdInt i) "" "" "" "" [] UDIdNone "" "" []
@@ -76,17 +131,6 @@ initUDWord i = UDWord (UDIdInt i) "" "" "" "" [] UDIdNone "" "" []
 prUDWordParts :: UDWord -> [String]
 prUDWordParts (UDWord id fo le up xp fe he de ds mi) =
     [prt id,fo,le,up,xp,prt fe,prt he,de,ds,prt mi]
-
-parseUDFile :: FilePath -> IO [UDSentence]
-parseUDFile f = readFile f >>= return . parseUDText
-
-parseUDText :: String -> [UDSentence]
-parseUDText = map prss . stanzas . filter (not . isGeneralComment) . lines
-  where isGeneralComment line = "##" `isPrefixOf` line
-
--- shorthand
-conlluFile2UDTrees :: FilePath -> IO [UDTree]
-conlluFile2UDTrees p = parseUDFile p >>= return . map udSentence2tree
 
 errorsInUDSentences :: [UDSentence] -> [String]
 errorsInUDSentences = concatMap errors
@@ -130,8 +174,8 @@ instance UDObject UDWord where
   errors w@(UDWord id fo le up xp fe he de ds mi) =
     concat [errors id, checkUDPOS up, errors fe, errors he, checkUDLabel de, errors mi] ++
     case w of
-      _ | not   ((udHEAD w /= udIdRoot || udDEPREL w == "root") 
-             && (udHEAD w == udIdRoot || udDEPREL w /= "root"))         -- head 0 iff label root
+      _ | not   ((udHEAD w /= rootID || udDEPREL w == "root") 
+             && (udHEAD w == rootID || udDEPREL w /= "root"))         -- head 0 iff label root
           -> ["root iff 0 does not hold in:",prt w]
       _ -> []
 
@@ -142,7 +186,7 @@ instance UDObject UDId where
     UDIdEmpty f -> show f
     UDIdNone -> "_"
   prs s = case (strip s) of
-    "0" -> udIdRoot
+    "0" -> rootID
     "_" -> UDIdNone
     _ | all isDigit s -> UDIdInt (read s)
     _ -> case break (flip elem ".-") s of
@@ -234,23 +278,6 @@ ud2posfeatswords s = unwords [udFORM u ++ ":<" ++ udUPOS u ++ "_" ++ prt (udFEAT
 -- converting to a hierarchical tree and back
 ----------------------------------------------
 
-type UDTree = RTree UDWord
-
-udSentence2tree :: UDSentence -> UDTree
-udSentence2tree s = s2t rootWord where
-  s2t hd = RTree hd [s2t w | w <- ws, udHEAD w == udID hd]
-  rootWord =
-    case [w | w <- ws, udHEAD w == udIdRoot] of -- unique if check succeeds
-      x:_ -> x
-      []  -> error $ "udSentence2tree: root word expected to have " ++ show udIdRoot ++ " as root, got instead\n" ++ (prUDSentence 1 (UDSentence [] ws))
-  ws = udWordLines s
-
--- opposite conversion
-udTree2sentence :: UDTree -> UDSentence
-udTree2sentence t = UDSentence {
-  udCommentLines = [],
-  udWordLines = sortOn udID (allNodes t)
-  }
 
 -- return the id of a sentence, taken from the comment that precedes it
 sentId :: UDSentence -> String 
@@ -273,7 +300,7 @@ prUDTreeString t = unwords [udFORM n | n <- sortOn udID (allNodes t)]
 
 checkUDWords :: [UDWord] -> [String]
 checkUDWords ws = concatMap errors ws ++ case ws of
-  _ | length (filter ((==udIdRoot) . udHEAD) ws) /=1               -- exactly one 0 
+  _ | length (filter ((==rootID) . udHEAD) ws) /=1               -- exactly one 0 
         -> ["no unique root in:", pws]
   _ | ids /= [1 .. length ids]
         -> ["word id sequence not 1..n in " ++ pws]
@@ -316,7 +343,7 @@ createRoot :: UDTree -> UDTree
 createRoot tree = tree {
   root = (root tree) {
     udDEPREL = root_Label, 
-    udHEAD = udIdRoot, 
+    udHEAD = rootID, 
     udMISC = UDData "ORIG_LABEL" [udDEPREL (root tree)] : udMISC (root tree)
   }
 }
@@ -337,7 +364,7 @@ isProjective udt = length nodes - 1 == maxId - minId
 
 int2udid :: Int -> UDId
 int2udid n = case n of
-   0 -> udIdRoot
+   0 -> rootID
    _ -> UDIdInt n
 
 udid2int :: UDId -> Int

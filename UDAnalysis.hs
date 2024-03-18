@@ -73,8 +73,8 @@ udTypeFrequencies ss =
     exx = concatMap (typesInUDTree . udSentence2tree) ss
 
 data UDType = UDType {
-  udVal  :: (POS,(Label,[UDData])),
-  udArgs :: [(POS,(Label,[UDData]))] -- including the val, to keep its position
+  udVal  :: (UPOS,(Label,[UDData])),
+  udArgs :: [(UPOS,(Label,[UDData]))] -- including the val, to keep its position
   }
  deriving (Eq,Ord,Show)
 
