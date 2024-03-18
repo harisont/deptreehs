@@ -1,6 +1,6 @@
 {-|
 Module      : RTree
-Description : Constructor and utilities for abstract rose trees
+Description : Constructor and utilities for (recursive) rose trees
 License     : BSD-2
 Maintainer  : arianna.masciolini@gu.se
 Stability   : experimental
