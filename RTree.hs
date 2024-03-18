@@ -6,36 +6,36 @@ Maintainer  : arianna.masciolini@gu.se
 Stability   : experimental
 Portability : POSIX
 
-Constructor and utilities for abstract (recursive) rose trees.
+Constructor and utilities for (recursive) rose trees.
 -}
 
 module RTree where
     
--- | [Rose](https://en.wikipedia.org/wiki/Rose_tree) (recursive) tree 
+-- | Recursive "[rose](https://en.wikipedia.org/wiki/Rose_tree)" tree 
 data RTree a = RTree {
   root :: a,              -- ^ root node
   subtrees :: [RTree a]   -- ^ list of subtrees
   } deriving (Eq,Show,Read)
 
--- | Returns the leaf nodes of a 'RTree'
+-- | Leaf nodes of a 'RTree'
 leaves :: RTree a -> [a]
 leaves t = case t of
   RTree a [] -> [a]
   RTree a ts -> concatMap leaves ts
 
--- | Returns a list of all nodes that make up a 'RTree'
+-- | List of all nodes that make up a 'RTree'
 allNodes :: RTree a -> [a]
 allNodes t = root t : concatMap allNodes (subtrees t)
 
--- | Returns a list of all of a 'RTree''s subtrees (recursively extracted)
+-- | List of all of a 'RTree''s subtrees (recursively extracted)
 allSubtrees :: RTree a -> [RTree a]
 allSubtrees t = t : concatMap allSubtrees (subtrees t)
 
--- | Returns the number of nodes of a 'RTree'
+-- | Number of nodes of a 'RTree'
 size :: RTree a -> Int
 size = length . allNodes
 
--- | Returns the depth of a 'RTree'
+-- | Depth of a 'RTree'
 depth :: RTree a -> Int
 depth (RTree _ []) = 1  
 depth (RTree _ ts) = 1 + maximum (map depth ts)  
@@ -49,13 +49,13 @@ isSubtree t u = t == u || any (isSubtree t) (subtrees u)
 rtmap :: (a -> b) -> RTree a -> RTree b
 rtmap r (RTree h ts) = RTree (r h) (map (rtmap r) ts)
 
--- | Returns the indented string representation of a 'RTree'
+-- | Indented string representation of a 'RTree'
 prIndented :: (a -> String) -> RTree a -> String
 prIndented prt = unlines . pr 0 where
   pr i t = indent i (prt (root t)) : concatMap (pr (i+4)) (subtrees t)
   indent i s = replicate i ' ' ++ s
 
--- | Returns the bracketed string representation of a 'RTree'
+-- | Bracketed string representation of a 'RTree'
 prBracketed :: (a -> String) -> RTree a -> String
 prBracketed pr t = case t of
   RTree a [] -> pr a
