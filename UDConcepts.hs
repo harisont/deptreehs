@@ -17,7 +17,6 @@ import Data.List.Split
 import Data.Char
 
 import RTree
-import UDStandard
 import Utils
 
 -- * UD objects
@@ -113,7 +112,29 @@ rootID = UDIdInt 0
 type UPOS = String
 
 checkUPOS :: String -> [String]
-checkUPOS = checkInList "UD Pos tag" (map fst allUDPos)
+checkUPOS = checkInList "UD Pos tag" (map fst allUPOSs)
+
+-- | Complete list of UPOS tags paired with explanations. Used for validation
+allUPOSs :: [(String,String)]
+allUPOSs = [
+  ("ADJ", "adjective"),
+  ("ADP", "adposition"),
+  ("ADV", "adverb"),
+  ("AUX", "auxiliary"),
+  ("CCONJ", "coordinating conjunction"),
+  ("DET", "determiner"),
+  ("INTJ", "interjection"),
+  ("NOUN", "noun"),
+  ("NUM", "numeral"),
+  ("PART", "particle"),
+  ("PRON", "pronoun"),
+  ("PROPN", "proper noun"),
+  ("PUNCT", "punctuation"),
+  ("SCONJ", "subordinating conjunction"),
+  ("SYM", "symbol"),
+  ("VERB", "verb"),
+  ("X", "other")
+  ]
 
 -- ** XPOS
 -- | Language-specific POS tag (fifth column of a CoNNL-U file)
@@ -141,9 +162,52 @@ instance UDObject UDData where
 -- | Dependency label (eight column of a CoNNL-U file)
 type Label = String
 
+-- | Complete list of dependency labels (without subtypes) 
+-- paired with explanations. Used for validation
+allLabels :: [(Label,String)]
+allLabels = [
+  ("acl", "clausal modifier of noun (adjectival clause)"),
+  ("advcl", "adverbial clause modifier"),
+  ("advmod", "adverbial modifier"),
+  ("amod", "adjectival modifier"),
+  ("appos", "appositional modifier"),
+  ("aux", "auxiliary"),
+  ("case", "case marking"),
+  ("cc", "coordinating conjunction"),
+  ("ccomp", "clausal complement"),
+  ("clf", "classifier"),
+  ("compound", "compound"),
+  ("conj", "conjunct"),
+  ("cop", "copula"),
+  ("csubj", "clausal subject"),
+  ("dep", "unspecified dependency"),
+  ("det", "determiner"),
+  ("discourse", "discourse element"),
+  ("dislocated", "dislocated elements"),
+  ("expl", "expletive"),
+  ("fixed", "fixed multiword expression"),
+  ("flat", "flat multiword expression"),
+  ("goeswith", "goes with"),
+  ("iobj", "indirect object"),
+  ("list", "list"),
+  ("mark", "marker"),
+  ("nmod", "nominal modifier"),
+  ("nsubj", "nominal subject"),
+  ("nummod", "numeric modifier"),
+  ("obj", "object"),
+  ("obl", "oblique nominal"),
+  ("orphan", "orphan"),
+  ("parataxis", "parataxis"),
+  ("punct", "punctuation"),
+  ("reparandum", "overridden disfluency"),
+  ("root", "root"),
+  ("vocative", "vocative"),
+  ("xcomp", "open clausal complement")
+  ]
+
 checkLabel :: String -> [String]
 checkLabel s = let (t,a) = break (==':') s in
-  checkInList "UD label" (map fst allUDLabels) t
+  checkInList "UD label" (map fst allLabels) t
 
 -- | Dummy label
 depLabel = "dep"

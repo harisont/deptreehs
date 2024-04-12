@@ -17,7 +17,6 @@ library
       UDConcepts,
       UDOptions,
       UDPatterns,
-      UDStandard,
       UDEval,
       UDVisualizations
    other-modules:
