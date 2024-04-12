@@ -7,21 +7,18 @@ import RTree
 import UDConcepts
 --import GFConcepts
 import UDAnalysis
-import UDOptions
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
 import Utils
 
 
-showMatchesInUDSentence :: Opts -> UDPattern -> UDSentence -> String
-showMatchesInUDSentence opts p s =
+showMatchesInUDSentence :: UDPattern -> UDSentence -> String
+showMatchesInUDSentence p s =
   if   null matches then ""
   else unlines (udCommentLines s ++ matches)
  where
    matches = [prt (adjust t) | t <- matchesUDPattern p (sentence2tree s)]
    adjust
-     | isOpt opts "adjust" = tree2sentence . subtree2tree
-     | isOpt opts "prune" = tree2sentence . (\t -> t{subtrees = []})
      | otherwise = tree2sentence
 
 matchesUDPattern :: UDPattern -> UDTree -> [UDTree]

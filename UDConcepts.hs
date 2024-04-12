@@ -235,6 +235,22 @@ data UDWord = UDWord {
   udMISC   :: [UDData]  -- ^ any other annotation
   } deriving (Show,Eq,Ord)
 
+type Field = String
+
+-- | List of standard CoNNL-U field names
+allFieldNames :: [Field]
+allFieldNames = [
+  "ID", 
+  "FORM", 
+  "LEMMA", 
+  "UPOS", 
+  "XPOS", 
+  "FEATS", 
+  "HEAD", 
+  "DEPREL",
+  "DEPS",
+  "MISC"]
+
 instance Read UDWord where
   readsPrec _ s = [(prs s :: UDWord, "")]
 
