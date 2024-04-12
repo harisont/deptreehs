@@ -18,7 +18,10 @@ library
       UDOptions,
       UDPatterns,
       UDStandard,
+      UDEval,
       UDVisualizations
+   other-modules:
+      Utils
    build-depends:
       base,
       containers,

@@ -10,6 +10,7 @@ import UDAnalysis
 import UDOptions
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
+import Utils
 
 
 showMatchesInUDSentence :: Opts -> UDPattern -> UDSentence -> String
@@ -19,7 +20,7 @@ showMatchesInUDSentence opts p s =
  where
    matches = [prt (adjust t) | t <- matchesUDPattern p (sentence2tree s)]
    adjust
-     | isOpt opts "adjust" = adjustUDIds . tree2sentence . createRoot
+     | isOpt opts "adjust" = tree2sentence . subtree2tree
      | isOpt opts "prune" = tree2sentence . (\t -> t{subtrees = []})
      | otherwise = tree2sentence
 
@@ -36,7 +37,7 @@ showReplacementsInUDSentence rep s =
     if changed then ["# newtext = " ++ unwords (map udFORM (udWordLines ns))] else []
     })
  where
-   ns = adjustUDIds $ tree2sentence $ createRoot tr
+   ns = tree2sentence $ subtree2tree tr
    (tr,changed) = replacementsWithUDPattern rep (sentence2tree s)
 
 replacementsWithUDPattern :: UDReplacement -> UDTree -> (UDTree,Bool)
@@ -124,8 +125,8 @@ findMatchingUDSequence strict ps tree
  where
   nodes = udWordLines (tree2sentence tree)
   parts = if strict then segments else sublists
-  begin ns = udPosition (udID (head ns)) -- exists because ps > 0
-  end ns = udPosition (udID (last ns))
+  begin ns = id2int (udID (head ns)) -- exists because ps > 0
+  end ns = id2int (udID (last ns))
 
 
 data UDReplacement =
@@ -211,7 +212,7 @@ smallestSpanningUDSubtree begin end tree = case tree of
     t:_ -> smallestSpanningUDSubtree begin end t -- t is unique, since each node occurs once
     _ -> Just tree -- must cover due to the size condition
  where
-   covers t = all (\n -> elem n [udPosition (udID w) | w <- allNodes t]) [begin..end]
+   covers t = all (\n -> elem n [id2int (udID w) | w <- allNodes t]) [begin..end]
 
 
 --------------------------------------------------

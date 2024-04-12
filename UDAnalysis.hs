@@ -33,7 +33,7 @@ udFrequencyMap opts sents
       ("LEMMA", udLEMMA),
       ("POS",   udUPOS),
       ("FEATS", prt . udFEATS),
-      ("DISTANCE", \w -> show (udid2int (udHEAD w) - udid2int (udID w))),
+      ("DISTANCE", \w -> show (id2int (udHEAD w) - id2int (udID w))),
       ("DEPREL", udDEPREL)
       ]
     allWords = concatMap udWordLines sents
@@ -87,9 +87,9 @@ typeOfUDTree tr@(RTree un uts) =
   UDType tun
          (map snd (sort (ptun:[(udID n, (udUPOS n,(udDEPREL n, udFEATS n))) | RTree n _ <- uts])))
  where
-   (position,tun) = (udID un, (udUPOS un,(head_Label, udFEATS un)))
+   (position,tun) = (udID un, (udUPOS un,(headLabel, udFEATS un)))
 ---   (position,tun) = (udID un, (udUPOS un,(udDEPREL un, udFEATS un)))
-   ptun = (udID un, (udUPOS un,(head_Label, udFEATS un)))
+   ptun = (udID un, (udUPOS un,(headLabel, udFEATS un)))
 
 typesInUDTree :: UDTree -> [(UDType,String)] -- type and example
 typesInUDTree tr =
