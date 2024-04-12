@@ -112,12 +112,13 @@ int2id n = case n of
   _ -> UDIdInt n
 
 -- | Convert a `UDId` into an integer. Calling this function on a range ID,
--- such as 3-5, returns the lower bound (3). Missing IDs (_) are mapped to 0
+-- such as 3-5, returns the lower bound (3). 
+-- Other non-int IDs (_) are mapped to 0
 id2int :: UDId -> Int
 id2int i = case i of
   UDIdRange m n -> m
   UDIdInt n -> n
-  _ -> 0 --- Root, None, Float
+  _ -> 0
 
 -- | The ID of the root of a UD tree is always 0
 rootID :: UDId
