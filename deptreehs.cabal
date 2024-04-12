@@ -16,7 +16,6 @@ library
       UDAnalysis,
       UDConcepts,
       UDPatterns,
-      UDEval,
       UDVisualizations
    other-modules:
       Utils

@@ -59,6 +59,23 @@ instance UDObject d => UDObject [d] where
   errors ds = concatMap errors ds
 
 -- * CoNNL-U fields
+
+type Field = String
+
+-- | List of standard CoNNL-U field names
+allFieldNames :: [Field]
+allFieldNames = [
+  "ID", 
+  "FORM", 
+  "LEMMA", 
+  "UPOS", 
+  "XPOS", 
+  "FEATS", 
+  "HEAD", 
+  "DEPREL",
+  "DEPS",
+  "MISC"]
+
 -- $
 -- Some CoNNL-U fields have dedicated data types, while others, such as FORM
 -- and LEMMA, are simply treated as strings
@@ -234,22 +251,6 @@ data UDWord = UDWord {
   udDEPS   :: String,   -- ^ enhanced dependency graph
   udMISC   :: [UDData]  -- ^ any other annotation
   } deriving (Show,Eq,Ord)
-
-type Field = String
-
--- | List of standard CoNNL-U field names
-allFieldNames :: [Field]
-allFieldNames = [
-  "ID", 
-  "FORM", 
-  "LEMMA", 
-  "UPOS", 
-  "XPOS", 
-  "FEATS", 
-  "HEAD", 
-  "DEPREL",
-  "DEPS",
-  "MISC"]
 
 instance Read UDWord where
   readsPrec _ s = [(prs s :: UDWord, "")]
