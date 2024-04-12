@@ -71,8 +71,7 @@ sentence2visual s = Visual {
     wordLength = wld 
   , tokens = ts
   , deps = ds
-  , root = head $ [id2pos (udID t) | t <- wls, udDEPREL t == rootLabel]
-  }
+  , root = head $ [id2pos (udID t) | t <- wls, udDEPREL t == rootLabel]}
  where
   wls = udWordLines s
   wld i = maximum (0:[charWidth * fromIntegral (length w) | 
