@@ -1,7 +1,21 @@
--- Based on 
--- https://github.com/aarneranta/deptreepy/blob/main/utils/VisualizeUD.hs
+{-|
+Module      : UDVisualizations
+Description : Tree visualizations
+License     : BSD-2
+Maintainer  : arianna.masciolini@gu.se
+Stability   : experimental
+Portability : POSIX
 
-module UDVisualizations where
+Functions to generate LaTeX and SVG UD tree visualizations. 
+-}
+
+module UDVisualizations (
+  sentence2latex,
+  sentences2latexDoc,
+  sentence2svg,
+  sentences2htmlDoc
+) where
+
 import Prelude hiding ((<>)) -- GHC 8.4.1 clash with Text.PrettyPrint
 import qualified Data.Map as Map
 import Data.List (intersperse,nub,mapAccumL,find,groupBy,sortBy,partition)
@@ -12,37 +26,61 @@ import Data.List.Split
 import Text.PrettyPrint
 import System.Environment (getArgs)
 
-conlls2latexDoc :: [String] -> String
-conlls2latexDoc =
+import UDConcepts
+
+-- | Generate standalone LaTeX document for the given treebank
+sentences2latexDoc :: [UDSentence] -> String
+sentences2latexDoc =
   render .
   latexDoc .
   vcat .
   intersperse (text "" $+$ app "vspace" (text "4mm")) .
-  map conll2latex .
-  filter (not . null)
+  map sentence2latex 
 
-conlls2svgHTMLDoc :: [String] -> String
-conlls2svgHTMLDoc =
+-- | Generate standalone HTML document with embedded SVG visualizations
+-- for the given treebank
+sentences2htmlDoc :: [UDSentence] -> String
+sentences2htmlDoc =
   render .
   embedInHTML .
-  map conll2svg .
-  filter (not . null)
+  map sentence2svg
 
-conll2svg :: String -> Doc
-conll2svg = ppSVG . toSVG . conll2latex' . parseCoNLL
+-- | Generate SVG code for the given sentence
+sentence2svg :: UDSentence -> Doc
+sentence2svg = ppSVG . toSVG . sentence2latex'
 
-conll2latex :: String -> Doc
-conll2latex = ppLaTeX . conll2latex' . parseCoNLL
+-- | Generate LaTeX fragment for the given sentence
+sentence2latex :: UDSentence -> Doc
+sentence2latex = ppLaTeX . sentence2latex'
 
-conll2latex' :: CoNLL -> [LaTeX]
-conll2latex' = dep2latex . conll2dep'
+sentence2latex' :: UDSentence -> [LaTeX]
+sentence2latex' = visual2latex . sentence2visual
 
-data Dep = Dep {
-    wordLength  :: Int -> Double        -- length of word at position int       -- was: fixed width, millimetres (>= 20.0)
-  , tokens      :: [(String,(String,String))]    -- word, (pos,features) (0..)
-  , deps        :: [((Int,Int),String)] -- from, to, label
-  , root        :: Int                  -- root word position
+-- | Intermediate data type to store sentence info to be visualizes
+data Visual = Visual {
+    wordLength :: Int -> Double           -- ^ length of n-th word
+  , tokens :: [(String,(String,String))]  -- ^ list of minimal token info in 
+                                          -- (FORM,(UPOS,DEPREL)) format
+  , deps :: [((Int,Int),String)]          -- ^ list of dependencies in
+                                          -- ((dependent,head),label) format 
+  , root :: Int                           -- position of the root token
   }
+
+sentence2visual :: UDSentence -> Visual
+sentence2visual s = Visual {
+    wordLength = wld 
+  , tokens = ts
+  , deps = ds
+  , root = head $ [id2pos (udID t) | t <- wls, udDEPREL t == rootLabel]
+  }
+ where
+  wls = udWordLines s
+  wld i = maximum (0:[charWidth * fromIntegral (length w) | 
+                       w <- let (f,(p,d)) = ts !! i in [f,p]])
+  ts = [(udFORM t,(udUPOS t,udDEPREL t)) | t <- wls]
+  ds = [((id2pos $ udHEAD t, id2pos $ udID t), udDEPREL t) | 
+          t <- wls, udDEPREL t /= rootLabel]
+  id2pos id = max 0 (id2int id - 1)
 
 -- some general measures
 defaultWordLength = 20.0  -- the default fixed width word length, making word 100 units
@@ -75,8 +113,8 @@ putArc frwld height x y label = [oval,arrowhead,labelling] where
   endp = (if x < y then (+) else (-)) ctr (wdth/2)            -- the point of the arrow
   rwld = 0.5 ----
 
-dep2latex :: Dep -> [LaTeX]
-dep2latex d =
+visual2latex :: Visual -> [LaTeX]
+visual2latex d =
   [Comment (unwords (map fst (tokens d))),
    Picture defaultUnit (width,height) (
      [Put (wpos rwld i,0) (Text w) | (i,w) <- zip [0..] (map fst (tokens d))]   -- words
@@ -96,31 +134,6 @@ dep2latex d =
      uvs -> 1 + maximum (0:[depth u v | (u,v) <- uvs])
    width = {-round-} (sum [wsize rwld w | (w,_) <- zip [0..] (tokens d)]) + {-round-} spaceLength * fromIntegral ((length (tokens d)) - 1)
    height = 50 + 20 * {-round-} (maximum (0:[aheight x y | ((x,y),_) <- deps d]))
-
-type CoNLL = [[String]]
-parseCoNLL :: String -> CoNLL
-parseCoNLL = map (splitOn "\t") . filter ((/="#") . take 1) . lines
-
---conll2dep :: String -> Dep
---conll2dep = conll2dep' . parseCoNLL
-
-readInt :: String -> Maybe Int
-readInt s = if all isDigit s then Just (read s) else Nothing
-
-conll2dep' :: CoNLL -> Dep
-conll2dep' ls = Dep {
-    wordLength = wld 
-  , tokens = toks
-  , deps = dps
-  -- catMaybes is used to ignore decimal numbers (empty nodes) and multiword tokens (ranges)
-  , root = head $ map (\x -> x-1) (catMaybes [readInt x | x:_:_:_:_:_:"0":_ <- ls]) ++ [1]
-  }
- where
-   wld i = maximum (0:[charWidth * fromIntegral (length w) | w <- let (tok,(pos,feat)) = toks !! i in [tok,pos {-,feat-}]]) --- feat not shown
-   toks = [(w,(c,m)) | _:w:_:c:_:m:_ <- ls]
-   dps = map (\((my,mx),lab) -> ((fromJust my - 1, fromJust mx - 1), lab)) (filter (\((my,mx),_) -> isJust my && isJust mx) [((readInt y, readInt x),lab) | x:_:_:_:_:_:y:lab:_ <- ls, y /="0"])
-   --maxdist = maximum [abs (x-y) | ((x,y),_) <- dps]
-
 
 -- * LaTeX Pictures (see https://en.wikibooks.org/wiki/LaTeX/Picture)
 
