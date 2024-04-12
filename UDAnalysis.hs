@@ -65,42 +65,67 @@ frequencyList opts sents =
 
 -- * Attachment scores
 
+-- $
+-- Functions for computing Labelled and Unlabelled Attachment scores. 
+-- Scores can be computed for a single sentence or for a full corpus.
+
+-- | Scoring criterion
+type Criterion = UDWord -> UDWord -> Bool
+
+-- | Labelled Attachment Score
+las :: Criterion
+las g t = udHEAD g == udHEAD t && udDEPREL g == udDEPREL t
+
+-- | Unlabelled Attachment Score
+uas :: Criterion
+uas g t = udHEAD g == udHEAD t 
+
+-- | Record type for scores
 data UDScore = UDScore {
-  udScore          :: Double, --- redundant
-  udMatching       :: Int, -- if the words are the same. 1 or 0 for a single sentence, sum for a corpus
-  udTotalLength    :: Int, -- number of words
-  udSamesLength    :: Int, -- number of words with matching (head,label)
-  udPerfectMatch   :: Int  -- all words have match (head,label). 1 or 0 for single sentence, sum for corpus
-  }
- deriving Show
+  udScore :: Double,    -- ^ numerical score (LAS or UAS)
+  udMatching :: Int,    -- ^ whether the words are the same (1 or 0 for 
+                        -- single-sentence scores, sum for corpus scores
+  udTotalLength :: Int, -- ^ number of words
+  udSamesLength :: Int, -- ^ number of words with matching (head,label)
+  udPerfectMatch :: Int -- ^ whether all words have matching (head,label) 
+                        -- (1 or 0 for single-sentence scores, sum for corpus 
+                        -- scores)
+  } deriving Show
 
-type ScoringCriterion = UDWord -> UDWord -> Bool
+-- | Given a scoring criterion, a gold sentence and a list of possible parses,
+-- return the best candidate parse and its score
+sentenceScore :: 
+  Criterion -> UDSentence -> [UDSentence] -> (UDSentence,UDScore)
+sentenceScore agree gold testeds = (tested,score) 
+  where
+    score = UDScore {
+      udScore = fromIntegral (length sames) / fromIntegral (length alls),
+      udMatching = areMatching,
+      udTotalLength = length alls,
+      udSamesLength = length sames,
+      udPerfectMatch = if length sames == length alls then 1 else 0
+      } 
+    alls = udWordLines tested
+    tested = maximumBy 
+      (\t u -> compare (length (samest t)) (length (samest u))) 
+      testeds
+    sames = samest tested
+    samest tsd = 
+      [() | (g,t) <- zip (udWordLines gold) (udWordLines tsd), agree g t]
+    areMatching = 
+      if map udFORM (udWordLines gold) == map udFORM (udWordLines tested) 
+        then 1 
+        else 0
 
-agreeLAS g t = udHEAD g == udHEAD t && udDEPREL g == udDEPREL t
-agreeUAS g t = udHEAD g == udHEAD t 
-
--- return the best candidate and its score
-udSentenceScore :: ScoringCriterion -> UDSentence -> [UDSentence] -> (UDSentence,UDScore)
-udSentenceScore agree gold testeds = (tested,score) where
-
-  score = UDScore {
-    udScore = fromIntegral (length sames) / fromIntegral (length alls),
-    udMatching = areMatching,
-    udTotalLength = length alls,
-    udSamesLength = length sames,
-    udPerfectMatch = if (length sames == length alls) then 1 else 0
-    } 
-
-  alls = udWordLines tested
-  tested = maximumBy (\t u -> compare (length (samest t)) (length (samest u))) testeds
-  sames = samest tested
-  samest tsd = [() | (g,t) <- zip (udWordLines gold) (udWordLines tsd), agree g t]
-  areMatching = if (map udFORM (udWordLines gold) == map udFORM (udWordLines tested)) then 1 else 0
-
-
--- test on corpus level: in the tested corpus, group together trees for the same sentence
-udCorpusScore :: Bool -> ScoringCriterion -> [UDSentence] -> [UDSentence] -> UDScore
-udCorpusScore isMicro agree golds tests = UDScore {
+-- | Compute the micro or macro corpus-level score. 
+-- In the tested corpus, group trees for the same sentence together
+corpusScore :: 
+  Bool            -- ^ 'True' for micro, 'False' for macro
+  -> Criterion    -- ^ scoring criterion
+  -> [UDSentence] -- ^ gold corpus
+  -> [UDSentence] -- ^ tested corpus (e.g. automatically parsed sentences)
+  -> UDScore
+corpusScore isMicro agree golds tests = UDScore {
   udScore = if isMicro
             then fromIntegral numbersames / fromIntegral numberalls                -- micro score (per word)
             else sum (map udScore sentenceScores) / fromIntegral (length sentenceScores), -- macro score (per sentence)
@@ -112,18 +137,17 @@ udCorpusScore isMicro agree golds tests = UDScore {
   where
     sentenceScores =
       filter ((>0) . udMatching) $ map snd $
-        map (uncurry (udSentenceScore agree)) (zip golds testgroups)
+        map (uncurry (sentenceScore agree)) (zip golds testgroups)
     numberalls  =  sum (map udTotalLength sentenceScores)
     numbersames =  sum (map udSamesLength sentenceScores)
     testgroups  = groupBy (\t u -> sent t == sent u) tests
     sent t = unwords $ map udFORM $ udWordLines t
 
-
 -- * Cosine similarity
 
--- Cosine similarity between two treebanks
-udCosineSimilarity :: [Opt] -> [UDSentence] -> [UDSentence] -> Double
-udCosineSimilarity opts xs ys = cosineSimilarityOfMaps fxs fys
+-- | Compute the cosine similarity between two treebanks
+cosineSimilarity :: [Opt] -> [UDSentence] -> [UDSentence] -> Double
+cosineSimilarity opts xs ys = cosineSimilarityOfMaps fxs fys
   where
     fxs = frequencyMap opts xs
     fys = frequencyMap opts ys
