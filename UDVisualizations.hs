@@ -9,12 +9,7 @@ Portability : POSIX
 Functions to generate LaTeX and SVG UD tree visualizations. 
 -}
 
-module UDVisualizations (
-  sentence2latex,
-  sentences2latexDoc,
-  sentence2svg,
-  sentences2htmlDoc
-) where
+module UDVisualizations where
 
 import Prelude hiding ((<>)) -- GHC 8.4.1 clash with Text.PrettyPrint
 import qualified Data.Map as Map
@@ -28,6 +23,8 @@ import System.Environment (getArgs)
 
 import UDConcepts
 
+-- * Generating LaTeX visualizations
+
 -- | Generate standalone LaTeX document for the given treebank
 sentences2latexDoc :: [UDSentence] -> String
 sentences2latexDoc =
@@ -35,7 +32,13 @@ sentences2latexDoc =
   latexDoc .
   vcat .
   intersperse (text "" $+$ app "vspace" (text "4mm")) .
-  map sentence2latex 
+  map (ppLaTeX . sentence2latex) 
+
+-- | Generate LaTeX fragment for the given sentence
+sentence2latexFragment :: UDSentence -> String
+sentence2latexFragment = render . ppLaTeX . sentence2latex
+
+-- * Generating SVG visualizations
 
 -- | Generate standalone HTML document with embedded SVG visualizations
 -- for the given treebank
@@ -43,20 +46,19 @@ sentences2htmlDoc :: [UDSentence] -> String
 sentences2htmlDoc =
   render .
   embedInHTML .
-  map sentence2svg
+  map (ppSVG . latex2svg . sentence2latex)
 
 -- | Generate SVG code for the given sentence
-sentence2svg :: UDSentence -> Doc
-sentence2svg = ppSVG . toSVG . sentence2latex'
+sentence2svgFragment :: UDSentence -> String
+sentence2svgFragment = render . ppSVG . latex2svg . sentence2latex
 
--- | Generate LaTeX fragment for the given sentence
-sentence2latex :: UDSentence -> Doc
-sentence2latex = ppLaTeX . sentence2latex'
+-- | Internal representations and conversions
+sentence2latex :: UDSentence -> [LaTeX]
+sentence2latex = visual2latex . sentence2visual
 
-sentence2latex' :: UDSentence -> [LaTeX]
-sentence2latex' = visual2latex . sentence2visual
+-- * Internal representations and conversion functions
 
--- | Intermediate data type to store sentence info to be visualizes
+-- | Intermediate data type to store sentence info to be visualized
 data Visual = Visual {
     wordLength :: Int -> Double           -- ^ length of n-th word
   , tokens :: [(String,(String,String))]  -- ^ list of minimal token info in 
@@ -66,6 +68,23 @@ data Visual = Visual {
   , root :: Int                           -- position of the root token
   }
 
+-- ** DSL for LaTeX (limited to comments and pictures)
+data LaTeX = Comment String | Picture UnitLengthMM Size [DrawingCommand]
+data DrawingCommand = Put Position Object
+data Object = Text String | TinyText String | OvalTop Size | ArrowDown Length
+type UnitLengthMM = Double
+type Size = (Double,Double)
+type Position = (Double,Double)
+type Length = Double 
+
+-- ** DSL for SVG
+data SVG = CharData String | Elem TagName Attrs [SVG]
+type TagName = String
+type Attrs = [(String,String)]
+
+-- ** Conversions
+
+-- | Convert a 'UDSentence' into a 'Visual'
 sentence2visual :: UDSentence -> Visual
 sentence2visual s = Visual {
     wordLength = wld 
@@ -80,43 +99,14 @@ sentence2visual s = Visual {
   ds = [((id2pos $ udHEAD t, id2pos $ udID t), udDEPREL t) | 
           t <- wls, udDEPREL t /= rootLabel]
   id2pos id = max 0 (id2int id - 1)
+  charWidth = 1.8
 
--- some general measures
-defaultWordLength = 20.0  -- the default fixed width word length, making word 100 units
-defaultUnit       = 0.2   -- unit in latex pictures, 0.2 millimetres
-spaceLength       = 10.0
-charWidth = 1.8
-
-labellength l  = fromIntegral (length l) * 4.5  -- assuming each char is 4.5 units wide
-wsize rwld  w  = 100 * rwld w + spaceLength                   -- word length, units
-wpos rwld i    = sum [wsize rwld j | j <- [0..i-1]]           -- start position of the i'th word
-wdist rwld x y = sum [wsize rwld i | i <- [min x y .. max x y - 1]]    -- distance between words x and y
-labelheight h  = h + arcbase + 3    -- label just above arc; 25 would put it just below
-labelstart c l = c - (labellength l)/2 -- label starts half of its length left of arc centre
-arcbase        = 30.0               -- arcs start and end 40u above the bottom
-arcfactor r    = r * 600            -- reduction of arc size from word distance
-xyratio        = 3                  -- width/height ratio of arcs
-
-putArc :: (Int -> Double) -> Int -> Int -> Int -> String -> [DrawingCommand]
-putArc frwld height x y label = [oval,arrowhead,labelling] where
-  oval = Put (ctr,arcbase) (OvalTop (wdth,hght))
-  arrowhead = Put (endp,arcbase + 5) (ArrowDown 5)   -- downgoing arrow 5u above the arc base
-  labelling = Put (labelstart ctr label,labelheight (hght/2)) (TinyText label)
-  dxy  = wdist frwld x y             -- distance between words, >>= 20.0
-  ndxy = 100 * rwld * fromIntegral height  -- distance that is indep of word length
-  hdxy = dxy / 2                     -- half the distance
-  wdth = dxy - (arcfactor rwld)/dxy  -- longer arcs are wider in proportion
-  hght = ndxy / (xyratio * rwld)      -- arc height is independent of word length
-  begp = min x y                     -- begin position of oval
-  ctr  = wpos frwld begp + hdxy + (if x < y then 20 else  10)  -- LR arcs are farther right from center of oval
-  endp = (if x < y then (+) else (-)) ctr (wdth/2)            -- the point of the arrow
-  rwld = 0.5 ----
-
+-- | Convert a into a 'Visual' list of LaTeX commands and comments
 visual2latex :: Visual -> [LaTeX]
 visual2latex d =
   [Comment (unwords (map fst (tokens d))),
    Picture defaultUnit (width,height) (
-     [Put (wpos rwld i,0) (Text w) | (i,w) <- zip [0..] (map fst (tokens d))]   -- words
+    [Put (wpos rwld i,0) (Text w) | (i,w) <- zip [0..] (map fst (tokens d))]   -- words
   ++ [Put (wpos rwld i,15) (TinyText w) | (i,(w,_)) <- zip [0..] (map snd (tokens d))]   -- pos tags 15u above bottom
 ---  ++ [Put (wpos rwld i,-15) (TinyText w) | (i,(_,w)) <- zip [0..] (map snd (tokens d))]   -- features 15u below bottom -> DON'T SHOW
   ++ concat [putArc rwld (aheight x y) x y label | ((x,y),label) <- deps d]    -- arcs and labels
@@ -124,74 +114,48 @@ visual2latex d =
   ++ [Put (wpos rwld (root d) + 20,height - 10) (TinyText "root")]
   )]
  where
-   wld i  = wordLength d i  -- >= 20.0
-   rwld i = (wld i) / defaultWordLength       -- >= 1.0
-   aheight x y = depth (min x y) (max x y) + 1    ---- abs (x-y)
-   arcs = [(min u v, max u v) | ((u,v),_) <- deps d]
-   depth x y = case [(u,v) | (u,v) <- arcs, (x < u && v <= y) || (x == u && v < y)] of ---- only projective arcs counted
-     [] -> 0
-     uvs -> 1 + maximum (0:[depth u v | (u,v) <- uvs])
-   width = {-round-} (sum [wsize rwld w | (w,_) <- zip [0..] (tokens d)]) + {-round-} spaceLength * fromIntegral ((length (tokens d)) - 1)
-   height = 50 + 20 * {-round-} (maximum (0:[aheight x y | ((x,y),_) <- deps d]))
+  wld = wordLength d  -- >= 20.0
+  rwld i = wld i / defaultWordLength       -- >= 1.0
+  aheight x y = depth (min x y) (max x y) + 1    ---- abs (x-y)
+  arcs = [(min u v, max u v) | ((u,v),_) <- deps d]
+  depth x y = case [(u,v) | (u,v) <- arcs, (x < u && v <= y) || (x == u && v < y)] of ---- only projective arcs counted
+    [] -> 0
+    uvs -> 1 + maximum (0:[depth u v | (u,v) <- uvs])
+  width = {-round-} (sum [wsize rwld w | (w,_) <- zip [0..] (tokens d)]) + spaceLength * fromIntegral (length (tokens d) - 1 - 1)
+  height = 50 + 20 * {-round-} (maximum (0:[aheight x y | ((x,y),_) <- deps d]))
+  
+  -- general measures
+  defaultWordLength = 20.0  -- the default fixed width word length, making word 100 units
+  defaultUnit       = 0.2   -- unit in latex pictures, 0.2 millimetres
+  spaceLength       = 10.0
+  labellength l  = fromIntegral (length l) * 4.5  -- assuming each char is 4.5 units wide
+  wsize rwld  w  = 100 * rwld w + spaceLength                   -- word length, units
+  wpos rwld i    = sum [wsize rwld j | j <- [0..i-1]]           -- start position of the i'th word
+  arcbase        = 30.0               -- arcs start and end 40u above the bottom
+  wdist rwld x y = sum [wsize rwld i | i <- [min x y .. max x y - 1]]    -- distance between words x and y
+  labelheight h  = h + arcbase + 3    -- label just above arc; 25 would put it just below
+  labelstart c l = c - (labellength l)/2 -- label starts half of its length left of arc centre
+  arcfactor r    = r * 600            -- reduction of arc size from word distance
+  xyratio        = 3                  -- width/height ratio of arcs
 
--- * LaTeX Pictures (see https://en.wikibooks.org/wiki/LaTeX/Picture)
+  putArc :: (Int -> Double) -> Int -> Int -> Int -> String -> [DrawingCommand]
+  putArc frwld height x y label = [oval,arrowhead,labelling] where
+    oval = Put (ctr,arcbase) (OvalTop (wdth,hght))
+    arrowhead = Put (endp,arcbase + 5) (ArrowDown 5)   -- downgoing arrow 5u above the arc base
+    labelling = Put (labelstart ctr label,labelheight (hght/2)) (TinyText label)
+    dxy  = wdist frwld x y             -- distance between words, >>= 20.0
+    ndxy = 100 * rwld * fromIntegral height  -- distance that is indep of word length
+    hdxy = dxy / 2                     -- half the distance
+    wdth = dxy - (arcfactor rwld)/dxy  -- longer arcs are wider in proportion
+    hght = ndxy / (xyratio * rwld)      -- arc height is independent of word length
+    begp = min x y                     -- begin position of oval
+    ctr  = wpos frwld begp + hdxy + (if x < y then 20 else  10)  -- LR arcs are farther right from center of oval
+    endp = (if x < y then (+) else (-)) ctr (wdth/2)            -- the point of the arrow
+    rwld = 0.5 ----
 
--- We render both LaTeX and SVG from this intermediate representation of
--- LaTeX pictures.
-
-data LaTeX = Comment String | Picture UnitLengthMM Size [DrawingCommand]
-data DrawingCommand = Put Position Object
-data Object = Text String | TinyText String | OvalTop Size | ArrowDown Length
-
-type UnitLengthMM = Double
-type Size = (Double,Double)
-type Position = (Double,Double)
-type Length = Double
-
-
--- * latex formatting
-ppLaTeX = vcat . map ppLaTeX1
-  where
-    ppLaTeX1 el =
-      case el of
-        Comment s -> comment s
-        Picture unit size cmds ->
-          app "setlength{\\unitlength}" (text (show unit ++ "mm"))
-          $$ hang (app "begin" (text "picture")<>text (show size)) 2
-                  (vcat (map ppDrawingCommand cmds))
-          $$ app "end" (text "picture")
-          $$ text ""
-
-    ppDrawingCommand (Put pos obj) = put pos (ppObject obj)
-
-    ppObject obj =
-      case obj of
-        Text s -> text s
-        TinyText s -> small (text s)
-        OvalTop size -> text "\\oval" <> text (show size) <> text "[t]"
-        ArrowDown len -> app "vector(0,-1)" (text (show len))
-
-    put p@(_,_) = app ("put" ++ show p)
-    small w = text "{\\tiny" <+> w <> text "}"
-    comment s = text "%%" <+> text s -- line break show follow
-    
-app macro arg = text "\\" <> text macro <> text "{" <> arg <> text "}"
-
-
-latexDoc :: Doc -> Doc
-latexDoc body =
-  vcat [text "\\documentclass{article}",
-        text "\\usepackage[a4paper,margin=0.5in,landscape]{geometry}",
-        text "\\usepackage[utf8]{inputenc}",
-        text "\\begin{document}",
-        body,
-        text "\\end{document}"]
-
--- * SVG (see https://www.w3.org/Graphics/SVG/IG/resources/svgprimer.html)
-
--- | Render LaTeX pictures as SVG
-toSVG :: [LaTeX] -> [SVG]
-toSVG = concatMap toSVG1
+-- | Convert a list of 'LaTeX' commands to SVG
+latex2svg :: [LaTeX] -> [SVG]
+latex2svg = concatMap toSVG1
   where
     toSVG1 el =
       case el of
@@ -228,9 +192,8 @@ toSVG = concatMap toSVG1
                 r = h/2
                 sx = show . xc
                 sy = show . yc
-                path = unwords (["M",sx x1,sy y1,"Q",sx x1,sy y2,sx x2,sy y2,
-                                 "L",sx x3,sy y2,"Q",sx x4,sy y2,sx x4,sy y1])
-
+                path = unwords ["M",sx x1,sy y1,"Q",sx x1,sy y2,sx x2,sy y2,
+                                 "L",sx x3,sy y2,"Q",sx x4,sy y2,sx x4,sy y1]
             arrowDown (x,y) len =
                 [Elem "line" ["x1".=xc x,"y1".=yc y,"x2".=xc x,"y2".=y2,
                               ("stroke","black")] [],
@@ -246,36 +209,57 @@ toSVG = concatMap toSVG1
             y0 = num h+20
             num x = round (scale*x)
             scale = unit*5
-
+            
             infix 0 .=
             n.=v = (n,show v)
 
--- * SVG is XML
+-- ** LaTeX utils
 
-data SVG = CharData String | Elem TagName Attrs [SVG]
-type TagName = String
-type Attrs = [(String,String)]
+-- | "Pretty pring" a list of 'LaTeX' commands/comments, returning a 'Doc'
+ppLaTeX :: [LaTeX] -> Doc 
+ppLaTeX = vcat . map ppLaTeX1
+  where
+    ppLaTeX1 el =
+      case el of
+        Comment s -> comment s
+        Picture unit size cmds ->
+          app "setlength{\\unitlength}" (text (show unit ++ "mm"))
+          $$ hang (app "begin" (text "picture")<>text (show size)) 2
+                  (vcat (map ppDrawingCommand cmds))
+          $$ app "end" (text "picture")
+          $$ text ""
+    ppDrawingCommand (Put pos obj) = put pos (ppObject obj)
+    ppObject obj =
+      case obj of
+        Text s -> text s
+        TinyText s -> small (text s)
+        OvalTop size -> text "\\oval" <> text (show size) <> text "[t]"
+        ArrowDown len -> app "vector(0,-1)" (text (show len))
+    put p@(_,_) = app ("put" ++ show p)
+    small w = text "{\\tiny" <+> w <> text "}"
+    comment s = text "%%" <+> text s -- line break show follow
 
-embedInHTML svgs =
-  vcat $
-     [
-      text "<!DOCTYPE html>",
-      text "<html>",
-      text "<body>",
-      vcat svgs,
-      text "</body>",
-      text "</html>"
-     ] 
+-- | Apply LaTeX macro to a 'Doc'
+app :: 
+  String -- ^ macro name 
+  -> Doc -- ^ argument of the macro
+  -> Doc -- ^ resulting 'Doc'
+app macro arg = text "\\" <> text macro <> text "{" <> arg <> text "}"
 
-addHeaderSVG svgs =
-  vcat $
-       [text "<?xml version=\"1.0\" standalone=\"no\"?>",
-        text "<!DOCTYPE svg PUBLIC \"-//W3C//DTD SVG 1.1//EN\"",
-        text "\"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd\">",
-        text ""] ++
-        svgs -- It should be a single <svg> element...
+-- | Convert a LaTeX fragment into a complete, standalone LaTeX document
+latexDoc :: Doc -> Doc
+latexDoc body =
+  vcat [text "\\documentclass{article}",
+        text "\\usepackage[a4paper,margin=0.5in,landscape]{geometry}",
+        text "\\usepackage[utf8]{inputenc}",
+        text "\\begin{document}",
+        body,
+        text "\\end{document}"]
 
+-- ** SVG utils
 
+-- | "Pretty pring" a list of 'SVG' elements, returning a 'Doc'
+ppSVG :: [SVG] -> Doc 
 ppSVG svg =
   vcat (map ppSVG1 svg) -- It should be a single <svg> element...
   where
@@ -291,7 +275,7 @@ ppSVG svg =
 
     attr (n,v) = text " "<>text n<>text "=\""<>text (encode v)<>text "\""
 
-    encode s = foldr encodeEntity "" s
+    encode = foldr encodeEntity ""
 
     encodeEntity = encodeEntity' (const False)
     encodeEntity' esc c r =
@@ -300,3 +284,16 @@ ppSVG svg =
         '<' -> "&lt;"++r
         '>' -> "&gt;"++r
         _ -> c:r
+
+-- | Embed SVG fragments in an HTML document
+embedInHTML :: [Doc] -> Doc
+embedInHTML svgs =
+  vcat
+     [
+      text "<!DOCTYPE html>",
+      text "<html>",
+      text "<body>",
+      vcat svgs,
+      text "</body>",
+      text "</html>"
+     ] 
