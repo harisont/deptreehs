@@ -1,17 +1,56 @@
+{-|
+Module      : UDTrees
+Description : DSL and functions for pattern matching / replacement on UD trees
+License     : BSD-2
+Maintainer  : arianna.masciolini@gu.se
+Stability   : experimental
+Portability : POSIX
+
+Embedded DSL and functions for pattern matching and replacement on 'UDTree's.
+For additional information about the semantics of UD patterns, see
+-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module UDPatterns where
 
 import Data.Data
-import RTree
-import UDStandard
-import UDTrees
---import GFConcepts
-import UDAnalysis
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
-import Utils
 
+import Utils
+import UDStandard
+import RTree
+import UDTrees
+
+-- | Constructor for pattern matching
+data UDPattern =
+    FORM String
+  | LEMMA String
+  | UPOS String
+  | XPOS String
+  | MISC String String
+  | FEATS String
+  | FEATS_ String 
+  | DEPREL String
+  | DEPREL_ String
+  | AND [UDPattern]
+  | OR [UDPattern]
+  | NOT UDPattern
+  | SEQUENCE [UDPattern]
+  | SEQUENCE_ [UDPattern]
+  | TREE UDPattern [UDPattern]
+  | TREE_ UDPattern [UDPattern]
+  | TRUE
+  | PROJECTIVE
+  | ARG String String
+  | DEPTH Int
+  | DEPTH_UNDER Int
+  | DEPTH_OVER Int
+  | LENGTH Int
+  | LENGTH_UNDER Int
+  | LENGTH_OVER Int
+ deriving (Show,Read,Eq,Typeable,Data)
 
 showMatchesInUDSentence :: UDPattern -> UDSentence -> String
 showMatchesInUDSentence p s =
@@ -42,34 +81,6 @@ replacementsWithUDPattern :: UDReplacement -> UDTree -> (UDTree,Bool)
 replacementsWithUDPattern rep tree = case replaceWithUDPattern rep tree of
   (RTree node subtrs,b) -> let (trs,bs) = unzip (map (replacementsWithUDPattern rep) subtrs)
                            in (RTree node trs, or (b:bs))
-
-data UDPattern =
-    FORM String
-  | LEMMA String
-  | UPOS String
-  | XPOS String
-  | MISC String String
-  | FEATS String  -- feature list matches exactly
-  | FEATS_ String -- a sublist of features matches exactly
-  | DEPREL String   -- deprel matches exactly
-  | DEPREL_ String -- prefix part of deprel matches, e.g. nsubj:pass matches nsubs
-  | AND [UDPattern]
-  | OR [UDPattern]
-  | NOT UDPattern
-  | SEQUENCE [UDPattern]  -- the smallest subtree where patterns appear in linear sequence
-  | SEQUENCE_ [UDPattern]  -- as SEQUENCE, but holes between words are permitted
-  | TREE UDPattern [UDPattern] -- subtrees match exactly
-  | TREE_ UDPattern [UDPattern] -- some sublist of subtrees matches exactly
-  | TRUE
-  | PROJECTIVE
-  | ARG String String
-  | DEPTH Int
-  | DEPTH_UNDER Int
-  | DEPTH_OVER Int
-  | LENGTH Int
-  | LENGTH_UNDER Int
-  | LENGTH_OVER Int
- deriving (Show,Read,Eq,Typeable,Data)
 
 ifMatchUDPattern :: UDPattern -> UDTree -> Bool
 ifMatchUDPattern patt tree@(RTree node subtrees) = case patt of

@@ -8,6 +8,7 @@ Portability : POSIX
 
 Utilities for UD trees, including conversions from and to 'UDSentence's
 -}
+
 module UDTrees where
 
 import Data.List
