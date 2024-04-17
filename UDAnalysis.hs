@@ -7,16 +7,18 @@ Stability   : experimental
 Portability : POSIX
 
 Functions for the quantitative analysis of UD treebanks: statistics, 
-attachment scores and cosine similarities between treebanks.
+attachment scores and cosine similarities between treebanks
 -}
 
 module UDAnalysis where
 
-import RTree
-import UDConcepts
 import Data.List
 import Data.Char
 import qualified Data.Map as M
+
+import RTree
+import UDStandard
+import UDTrees
 
 -- | Name of a unit of analysis (a CoNNL-U `Field`, DISTANCE, LENGTH or DEPTH)
 type Opt = String

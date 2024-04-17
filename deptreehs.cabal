@@ -13,8 +13,9 @@ cabal-version: >= 1.10
 library
    exposed-modules:
       RTree,
+      UDStandard,
+      UDTrees,
       UDAnalysis,
-      UDConcepts,
       UDPatterns,
       UDVisualizations
    other-modules:

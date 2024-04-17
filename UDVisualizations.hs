@@ -1,12 +1,12 @@
 {-|
 Module      : UDVisualizations
-Description : Tree visualizations
+Description : UD tree visualizations
 License     : BSD-2
 Maintainer  : arianna.masciolini@gu.se
 Stability   : experimental
 Portability : POSIX
 
-Functions to generate LaTeX and SVG UD tree visualizations. 
+Functions to generate LaTeX and SVG UD tree visualizations
 -}
 
 module UDVisualizations where
@@ -21,7 +21,7 @@ import Data.List.Split
 import Text.PrettyPrint
 import System.Environment (getArgs)
 
-import UDConcepts
+import UDStandard
 
 -- * Generating LaTeX visualizations
 

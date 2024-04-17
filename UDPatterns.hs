@@ -4,7 +4,8 @@ module UDPatterns where
 
 import Data.Data
 import RTree
-import UDConcepts
+import UDStandard
+import UDTrees
 --import GFConcepts
 import UDAnalysis
 import Data.Maybe (listToMaybe)

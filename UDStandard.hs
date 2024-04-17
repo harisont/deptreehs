@@ -1,22 +1,21 @@
 {-|
-Module      : UDConcepts
-Description : Basic Universal Dependencies concepts
+Module      : UDStandard
+Description : Utilities for reading, writing and validating of UD treebanks
 License     : BSD-2
 Maintainer  : arianna.masciolini@gu.se
 Stability   : experimental
 Portability : POSIX
 
-Basic Universal Dependencies concepts, as defined in the CoNNL-U format 
-specification at [universaldependencies.org](universaldependencies.org).
+Utilities for reading, writing and validating UD treebanks in CoNNL-U format, 
+as specified at [universaldependencies.org](universaldependencies.org))
 -}
 
-module UDConcepts where
+module UDStandard where
 
 import Data.List
 import Data.List.Split
 import Data.Char
 
-import RTree
 import Utils
 
 -- * UD objects
@@ -299,14 +298,10 @@ prUDWordParts (UDWord id fo le up xp fe he de ds mi) =
 dependencyDistance :: UDWord -> Int
 dependencyDistance w = abs (id2int (udID w) - id2int (udHEAD w))
 
--- * CoNNL-U sentence representations
--- $
--- CoNNL-U sentences can be represented as sequences ('UDSentence's) or trees
--- ('UDTree's)
+-- * CoNNL-U sentences
 
--- ** Sentences
-
--- | UD sentence as sequence of 'UDWord's
+-- | UD sentence as a sequence of 'UDWord's (+ comments). 
+-- For conversions to and from a tree representation, see 'UDTree'
 data UDSentence = UDSentence {
   udCommentLines :: [String], -- ^ comment lines
   udWordLines    :: [UDWord]  -- ^ word tokens
@@ -408,76 +403,6 @@ ud2posfeatswords :: UDSentence -> String
 ud2posfeatswords s = unwords 
   [udFORM u ++ ":<" ++ udUPOS u ++ "_" ++ prt (udFEATS u) ++ ">" 
     | u <- udWordLines s]
-
--- ** Trees
-
--- | Tree represenation of a UD sentence. A 'UDTree' is a 'RTree' whose nodes
--- are 'UDWord's
-type UDTree = RTree UDWord
-
--- | Print 'UDTree' as nested 'UDWord's
-prtUDTree :: UDTree -> String
-prtUDTree = prIndented prt
-
--- | "Linearize" a 'UDTree' into a one-line sentence
-prtUDTreeLin :: UDTree -> String
-prtUDTreeLin t = unwords [udFORM n | n <- sortOn udID (allNodes t)]
-
--- | Convert a UD subtree into a complete tree that can be converted into 
--- valid CoNNL-U by rescaling IDs to be in the range 1-n and creating a root
--- node labelled as such  
-subtree2tree :: UDTree -> UDTree
-subtree2tree = sentence2tree . rescaleIds . tree2sentence . createRoot
-  where 
-    createRoot tree = tree {
-      root = (root tree) {
-        udDEPREL = rootLabel, 
-        udHEAD = rootID, 
-        udMISC = 
-          UDData "ORIG_LABEL" [udDEPREL (root tree)]:udMISC (root tree)}}
-    rescaleIds uds =
-      if ids == [1..length ws]
-      then uds
-      else uds{udWordLines = map fix ws}
-      where
-       ws = udWordLines uds
-       ids = [n | UDIdInt n <- map udID ws]
-       fixes = zip (map udID ws) (map UDIdInt [1..length ws])
-       fix udw = udw {
-         udID = let idw = udID udw in maybe idw id (lookup idw fixes),
-         udHEAD = let idw = udHEAD udw in maybe idw id (lookup idw fixes),
-         udMISC = UDData "ADJUSTED" ["True"] : udMISC udw}
-
--- | Return 'True' if a 'UDTree' is projective, i.e. if it does not have
--- any crossing arcs, 'False' otherwise
-isProjective :: UDTree -> Bool
-isProjective udt = length nodes - 1 == maxId - minId
- where
-   nodes = map (id2int . udID) (allNodes udt)
-   maxId = maximum nodes
-   minId = minimum nodes
-
--- ** Conversions between sentences and trees
-
--- | Convert a 'UDSentence' into a 'UDTree'
-sentence2tree :: UDSentence -> UDTree
-sentence2tree s = s2t rootWord where
-  s2t hd = RTree hd [s2t w | w <- ws, udHEAD w == udID hd]
-  rootWord =
-    case [w | w <- ws, udHEAD w == rootID] of -- unique if check succeeds
-      x:_ -> x
-      []  -> error $ 
-              "sentence2tree: root word expected to have " 
-              ++ show rootID ++ " as root, got instead\n" 
-              ++ (prt (UDSentence [] ws))
-  ws = udWordLines s
-
--- | Convert a 'UDTree' into a 'UDSentence' 
-tree2sentence :: UDTree -> UDSentence
-tree2sentence t = UDSentence {
-  udCommentLines = [],
-  udWordLines = sortOn udID (allNodes t)
-  }
 
 -- | * Parsing full CoNNL-U files
 
