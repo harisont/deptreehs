@@ -1,5 +1,5 @@
 {-|
-Module      : UDTrees
+Module      : UDPatterns
 Description : DSL and functions for pattern matching / replacement on UD trees
 License     : BSD-2
 Maintainer  : arianna.masciolini@gu.se
@@ -112,8 +112,13 @@ matchesPattern patt tree@(RTree node subtrees) = case patt of
       '*':pp -> pp == drop (length s - length pp) s
       _:_ | last p =='*' -> init p == take (length (init p)) s
       _ -> p == s
-  
-findMatchingUDSequence :: Bool -> [UDPattern] -> UDTree -> Maybe UDTree
+
+-- | Helper function for sequence matching
+findMatchingUDSequence :: 
+     Bool         -- ^ Whether gaps are allowed or not 
+  -> [UDPattern]  -- ^ The list of patterns to be matched in sequence
+  -> UDTree       -- ^ The tree to perform the matching on
+  -> Maybe UDTree -- ^ The smallest matching subtree, if any
 findMatchingUDSequence strict ps tree 
   | null ps = return tree
   | length ps > length nodes = Nothing
@@ -122,7 +127,8 @@ findMatchingUDSequence strict ps tree
              snodes <- parts (length ps) nodes,
              all (\ (p,n) -> matchesPattern p (RTree n [])) (zip ps snodes)
              ] of
-         snodes:_ -> smallestSpanningUDSubtree (begin snodes) (end snodes) tree
+         snodes:_ -> 
+          smallestSpanningUDSubtree (begin snodes) (end snodes) tree
          _ -> Nothing
  where
   nodes = udWordLines (tree2sentence tree)
@@ -131,6 +137,9 @@ findMatchingUDSequence strict ps tree
   end ns = id2int (udID (last ns))
 
 -- * Pattern replacement
+
+-- $
+-- Pattern replacement DSL
 
 data UDReplacement =
     REPLACE_FORM String String
@@ -145,31 +154,54 @@ data UDReplacement =
   | IF UDPattern UDReplacement
   | UNDER UDPattern UDReplacement
   | OVER UDPattern UDReplacement
-  | PRUNE UDPattern Int -- drop dependents down to depth Int
-  | FILTER_SUBTREES UDPattern UDPattern -- keep only subtrees that match the second pattern
-  | FLATTEN UDPattern -- lift dependents of dependents to the same level as dependents
-  | RETARGET UDPattern UDPattern UDPattern -- retarget subtrees that satisfy patt1 to their (first) sister that patt2  
-  | CHANGES [UDReplacement] -- try different replacements in this order, break after first applicable
-  | COMPOSE [UDReplacement] -- make all changes one after the other
+  | PRUNE UDPattern Int
+  | FILTER_SUBTREES UDPattern UDPattern
+  | FLATTEN UDPattern
+  | RETARGET UDPattern UDPattern UDPattern  
+  | CHANGES [UDReplacement]
+  | COMPOSE [UDReplacement]
  deriving (Show,Read,Eq)
 
+-- | Given a replacement pattern and a tree, return the "replaced" tree
+-- and a flag indicating whether the tree has been modified or not
 replaceWithUDPattern :: UDReplacement -> UDTree -> (UDTree,Bool)
 replaceWithUDPattern rep tree@(RTree node subtrs) = case rep of
-  REPLACE_FORM old new | matchesPattern (FORM old) tree -> true $ tree{root = node{udFORM = new}}
-  REPLACE_LEMMA old new | matchesPattern (LEMMA old) tree -> true $ tree{root = node{udLEMMA = new}}
-  REPLACE_POS old new | matchesPattern (UPOS old) tree -> true $ tree{root = node{udUPOS = new}}
-  REPLACE_XPOS old new | matchesPattern (XPOS old) tree -> true $ tree{root = node{udXPOS = new}}
-  REPLACE_MISC name old new | matchesPattern (MISC name old) tree -> true $ tree{root = node{udMISC = map (\ud -> if udArg ud == name then ud{udVals = getSeps ',' new} else ud) (udMISC node)}}
-  REPLACE_DEPREL old new | matchesPattern (DEPREL old) tree -> true $ tree{root = node{udDEPREL = new}}
-  REPLACE_DEPREL_ old new | matchesPattern (DEPREL_ old) tree -> true $ tree{root = node{udDEPREL = new}}
-  REPLACE_FEATS old new | matchesPattern (FEATS old) tree -> true $ tree{root = node{udFEATS = prs new}}
+  REPLACE_FORM old new | matchesPattern (FORM old) tree -> 
+    true $ tree{root = node{udFORM = new}}
+  REPLACE_LEMMA old new | matchesPattern (LEMMA old) tree -> 
+    true $ tree{root = node{udLEMMA = new}}
+  REPLACE_POS old new | matchesPattern (UPOS old) tree -> 
+    true $ tree{root = node{udUPOS = new}}
+  REPLACE_XPOS old new | matchesPattern (XPOS old) tree -> 
+    true $ tree{root = node{udXPOS = new}}
+  REPLACE_MISC name old new | matchesPattern (MISC name old) tree -> 
+    true $ tree {
+      root = node {
+        udMISC = map 
+          (\ud -> if udArg ud == name 
+                    then ud {udVals = getSeps ',' new} 
+                    else ud) 
+          (udMISC node)}}
+  REPLACE_DEPREL old new | matchesPattern (DEPREL old) tree -> 
+    true $ tree{root = node{udDEPREL = new}}
+  REPLACE_DEPREL_ old new | matchesPattern (DEPREL_ old) tree -> 
+    true $ tree{root = node{udDEPREL = new}}
+  REPLACE_FEATS old new | matchesPattern (FEATS old) tree -> 
+    true $ tree{root = node{udFEATS = prs new}}
   REPLACE_FEATS_ old new | matchesPattern (FEATS_ old) tree -> true $
     let news = [(udArg fv, udVals fv) | fv <- prs new] in
-    tree{root = node{udFEATS = [maybe fv (\v -> fv{udVals = v}) (lookup (udArg fv) news) | fv <- udFEATS node]}}
-  IF cond replace | matchesPattern cond tree -> replaceWithUDPattern replace tree
-  UNDER cond replace | matchesPattern cond tree -> true $ tree{subtrees = map (fst . replaceWithUDPattern replace) subtrs} 
-  OVER cond replace | any (matchesPattern cond) subtrs -> replaceWithUDPattern replace tree
-  PRUNE cond depth | matchesPattern cond tree -> true $ flattenRTree depth tree
+    tree {
+      root = node {
+        udFEATS = [maybe fv (\v -> fv{udVals = v}) (lookup (udArg fv) news) 
+                    | fv <- udFEATS node]}}
+  IF cond replace | matchesPattern cond tree -> 
+    replaceWithUDPattern replace tree
+  UNDER cond replace | matchesPattern cond tree -> 
+    true $ tree{ subtrees = map (fst . replaceWithUDPattern replace) subtrs } 
+  OVER cond replace | any (matchesPattern cond) subtrs -> 
+    replaceWithUDPattern replace tree
+  PRUNE cond depth | matchesPattern cond tree -> 
+    true $ flattenRTree depth tree
   FILTER_SUBTREES cond scond | matchesPattern cond tree ->
     let sts = [st | st <- subtrs, matchesPattern scond st]
     in (RTree node sts, length sts /= length subtrs)
@@ -179,16 +211,18 @@ replaceWithUDPattern rep tree@(RTree node subtrs) = case rep of
       retarget st = case newhead of
         subtr:_ | udID (root st) == udID (root subtr) ->
           [subtr{subtrees = subtrees subtr ++
-              [t{root = (root t){udHEAD = udID (root subtr)}} | t <- subtrs, matchesPattern patt1 t] }]
+              [t { root = (root t) { udHEAD = udID (root subtr) } } 
+                | t <- subtrs, matchesPattern patt1 t] }]
         _:_ | matchesPattern patt1 st -> []
         _ -> [st]
       sts = concat [retarget st | st <- subtrs]
     in (RTree node sts, length sts /= length subtrs)
   FLATTEN cond | matchesPattern cond tree ->
     let sts = concat
-                [subtr{subtrees = []} :
-                  [t{root = (root t){udHEAD = udID node}} | t <- subtrees subtr]
-                                 | subtr <- subtrs]
+                [subtr { subtrees = [] }:
+                  [t { root = (root t) { udHEAD = udID node }} 
+                    | t <- subtrees subtr]
+                  | subtr <- subtrs]
     in (RTree node sts, length sts /= length subtrs)
   CHANGES reps -> case reps of
     r:rs -> case replaceWithUDPattern r tree of
@@ -197,63 +231,16 @@ replaceWithUDPattern rep tree@(RTree node subtrs) = case rep of
     _ -> (tree,False)
   COMPOSE reps -> case reps of
     r:rs -> case replaceWithUDPattern r tree of
-      (tr,b) -> let (tr2,bs) = replaceWithUDPattern (COMPOSE rs) tr in (tr2, b || bs)
+      (tr,b) -> 
+        let (tr2,bs) = replaceWithUDPattern (COMPOSE rs) tr 
+        in (tr2, b || bs)
     _ -> (tree,False)
   _ -> (tree,False)
  where
-   true t = (t,True)
-
-flattenRTree :: Int -> RTree a -> RTree a
-flattenRTree d tr@(RTree node subtrs) = case d of
-  0 -> RTree node []
-  _ -> RTree node (map (flattenRTree (d-1)) subtrs)
-
-smallestSpanningUDSubtree :: Int -> Int -> UDTree -> Maybe UDTree
-smallestSpanningUDSubtree begin end tree = case tree of
-  _ | size tree < 1 + end - begin -> Nothing
-  _ -> case [t | t <- subtrees tree, covers t] of
-    t:_ -> smallestSpanningUDSubtree begin end t -- t is unique, since each node occurs once
-    _ -> Just tree -- must cover due to the size condition
- where
-   covers t = all (\n -> elem n [id2int (udID w) | w <- allNodes t]) [begin..end]
-
-
---------------------------------------------------
---- a hack to read FEATS with their usual syntax
-data UDDatas =
-    NIL
-  | CONS UDData UDDatas
-  deriving Show ----
-
-uddatas2list :: UDDatas -> [UDData]
-uddatas2list l = case l of
-  NIL -> []
-  CONS d ds -> d : uddatas2list ds
-
-list2uddatas :: [UDData] -> UDDatas 
-list2uddatas l = case l of
-  [] -> NIL
-  d:ds -> CONS d (list2uddatas ds)
-
-instance Read UDDatas where
-  readsPrec _ s = [(list2uddatas (prs s),"")]
-  
--------------------------------------------------
-
--- convenience, must be in some standard lib...
-
-sublists :: Int -> [a] -> [[a]]
-sublists n xs = case (n,xs) of
-  (0,_)  -> [[]]
-  (_,[]) -> []
-  (_,x:xx) -> [x:ys | ys <- sublists (n-1) xx] ++ sublists n xx
-
-segments :: Int -> [a] -> [[a]]
-segments n xs =
-  let lxs = length xs in
-  if n <= lxs then [take n (drop m xs) | m <- [0..lxs-n]]
-  else []
-
+    true t = (t,True)
+    flattenRTree d tr@(RTree node subtrs) = case d of
+      0 -> RTree node []
+      _ -> RTree node (map (flattenRTree (d-1)) subtrs)
 
 -- | Given a replacement and a tree, return a list of subtrees matching the 
 -- pattern and a flag indicating whether the tree has been modified or not
@@ -262,5 +249,3 @@ replacementsWithUDPattern rep tree = case replaceWithUDPattern rep tree of
   (RTree node subtrs,b) -> 
     let (trs,bs) = unzip (map (replacementsWithUDPattern rep) subtrs)
     in (RTree node trs, or (b:bs))
-
- 

@@ -85,6 +85,18 @@ subtree2tree = sentence2tree . rescaleIds . tree2sentence . createRoot
 isProjective :: UDTree -> Bool
 isProjective udt = length nodes - 1 == maxId - minId
  where
-   nodes = map (id2int . udID) (allNodes udt)
-   maxId = maximum nodes
-   minId = minimum nodes
+    nodes = map (id2int . udID) (allNodes udt)
+    maxId = maximum nodes
+    minId = minimum nodes
+
+-- | Find the smallest subtree covering tokens between the two given positions 
+smallestSpanningUDSubtree :: Int -> Int -> UDTree -> Maybe UDTree
+smallestSpanningUDSubtree begin end tree = case tree of
+  _ | size tree < 1 + end - begin -> Nothing
+  _ -> case [t | t <- subtrees tree, covers t] of
+    -- t is unique, since each node occurs once
+    t:_ -> smallestSpanningUDSubtree begin end t 
+    _ -> Just tree -- must cover due to the size condition
+ where
+   covers t = 
+    all (\n -> n `elem` ([id2int (udID w) | w <- allNodes t])) [begin..end]

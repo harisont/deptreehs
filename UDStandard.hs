@@ -331,6 +331,14 @@ instance UDObject UDSentence where
 -- for all instances of 'UDObject'. The functions below are used to produce  
 -- strings in less standard CoNLL variants
 
+-- | String consisting of 10 'x' and '_' characters, used to specify which
+-- CoNLL-U fields are to be printed when outputting reduced CoNLL-U like 
+-- format. The pattern '"xxxx\_\_xx\_\_"', for instance, is used for producing
+-- the simplified CoNNL-U format (ID, FORM, LEMMA, UPOS, HEAD and DEPREL)
+-- used in the Computational Syntax course of the MLT programme at the 
+-- University of Gothenburg
+type PrintPattern = String
+
 -- | Print a 'UDSentence' in CoNLL-U format excluding one or more fields,
 -- according to the input 'PrintPattern'
 prtReducedUDSentence :: PrintPattern -> UDSentence -> String

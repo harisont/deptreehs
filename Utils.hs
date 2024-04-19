@@ -1,3 +1,14 @@
+{-|
+Module      : Utils
+Description : Misc functions that might be in some other library but who knows
+License     : BSD-2
+Maintainer  : arianna.masciolini@gu.se
+Stability   : experimental
+Portability : POSIX
+
+Misc functions that might be in some other library but who knows
+-}
+
 module Utils where
 
 import Data.Char
@@ -37,16 +48,20 @@ getSepsEsc p = filter (not . null) . NonEmpty.toList . getSepsEsc'
 
 checkInList :: String -> [String] -> String -> [String]
 checkInList desc xs x = 
-  if x=="_" || S.member x xset
+  if x == "_" || S.member x xset
   then []
   else ["invalid " ++ desc ++ ": " ++ x]
  where
    xset = S.fromList xs
 
--- | String consisting of 10 'x' and '_' characters, used to specify which
--- CoNLL-U fields are to be printed when outputting reduced CoNLL-U like 
--- format. The pattern '"xxxx\_\_xx\_\_"', for instance, is used for producing
--- the simplified CoNNL-U format (ID, FORM, LEMMA, UPOS, HEAD and DEPREL)
--- used in the Computational Syntax course of the MLT programme at the 
--- University of Gothenburg
-type PrintPattern = String
+sublists :: Int -> [a] -> [[a]]
+sublists n xs = case (n,xs) of
+  (0,_)  -> [[]]
+  (_,[]) -> []
+  (_,x:xx) -> [x:ys | ys <- sublists (n-1) xx] ++ sublists n xx
+
+segments :: Int -> [a] -> [[a]]
+segments n xs =
+  let lxs = length xs in
+  if n <= lxs then [take n (drop m xs) | m <- [0..lxs-n]]
+  else []
