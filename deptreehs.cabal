@@ -17,12 +17,16 @@ library
       UDTrees,
       UDAnalysis,
       UDPatterns,
-      UDVisualizations
+      UDVisualizations,
+      UDPipe2
    other-modules:
       Utils
    build-depends:
       base,
       containers,
       split,
-      pretty
+      pretty,
+      utf8-string,
+      aeson,
+      curl
    default-language: Haskell2010
