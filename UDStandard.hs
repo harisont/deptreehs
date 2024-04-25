@@ -307,6 +307,9 @@ data UDSentence = UDSentence {
   udWordLines    :: [UDWord]  -- ^ word tokens
   }
 
+instance Show UDSentence where
+  show = prt
+
 instance UDObject UDSentence where
   prt s = prtReducedUDSentence "xxxxxxxxxx" s
   prss ss = case span ((=="#") . take 1) ss of
@@ -412,7 +415,7 @@ ud2posfeatswords s = unwords
   [udFORM u ++ ":<" ++ udUPOS u ++ "_" ++ prt (udFEATS u) ++ ">" 
     | u <- udWordLines s]
 
--- | * Parsing full CoNNL-U files
+-- * Parsing full CoNNL-U files
 
 -- | Parse a CoNNL-U file as a list of 'UDSentence's
 prsUDFile :: FilePath -> IO [UDSentence]
