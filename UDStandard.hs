@@ -23,6 +23,8 @@ import Utils
 -- UD sentences, word tokens, token IDs and other CoNNL-U fields are all 
 -- UD objects than can be printed, parsed and validated
 
+type ErrorMsg = String
+
 -- | Typeclass for all UD objects 
 class UDObject a where
   -- | Print in CoNLL-U format
@@ -37,11 +39,11 @@ class UDObject a where
   prss ss = prs (unlines ss)
 
   -- | Return a list of CoNLL-U format errors
-  errors :: a -> [String]
+  errors :: a -> [ErrorMsg]
   errors _ = []
 
   -- | Check and return either the checked object or a list of format errors
-  check :: a -> Either a [String] 
+  check :: a -> Either a [ErrorMsg] 
   check x = case errors x of 
     [] -> Left x ; 
     ss -> Right (("ERROR in " ++ prt x ++ ": ") : ss)
