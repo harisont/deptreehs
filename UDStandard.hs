@@ -15,6 +15,7 @@ module UDStandard where
 import Data.List
 import Data.List.Split
 import Data.Char
+import Data.Either
 
 import Utils
 
@@ -426,6 +427,21 @@ prsUDFile f = readFile f >>= return . prsUDText
 -- | Parse a CoNNL-U string as a list of 'UDSentence's
 prsUDText :: String -> [UDSentence]
 prsUDText = map prss . stanzas . filter (not . isGeneralComment) . lines
+
+-- | Check and parse a CoNNL-U file. Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
+chkNprsUDFile :: FilePath -> IO (Either [UDSentence] [ErrorMsg])
+chkNprsUDFile f = readFile f >>= return . chkNprsUDText
+
+-- | Check and parse a CoNNL-U string. Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
+chkNprsUDText :: String -> Either [UDSentence] [ErrorMsg]
+chkNprsUDText text =
+  let
+    results = map check . map (prss :: [String] -> UDSentence) . stanzas . filter (not . isGeneralComment) . lines $ text
+  in
+    if null $ rights results then
+      Left $ lefts results
+    else
+      Right $ map unwords $ rights results
 
 -- | Predicate that checks if a 'String' is a general comment, i.e., if it starts with ##
 isGeneralComment :: String -> Bool
