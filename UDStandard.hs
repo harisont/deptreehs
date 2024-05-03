@@ -424,9 +424,14 @@ prsUDFile f = readFile f >>= return . prsUDText
 -- | Parse a CoNNL-U string as a list of 'UDSentence's
 prsUDText :: String -> [UDSentence]
 prsUDText = map prss . stanzas . filter (not . isGeneralComment) . lines
-  where 
-    isGeneralComment line = "##" `isPrefixOf` line
-    stanzas ls = case dropWhile (all isSpace) ls of
-      []  -> []
-      wls -> case break (all isSpace) wls of
-        (s,ss) -> s : stanzas ss
+
+-- | Predicate that checks if a 'String' is a general comment, i.e., if it starts with ##
+isGeneralComment :: String -> Bool
+isGeneralComment line = "##" `isPrefixOf` line
+
+-- | Splits a list of lines into a list of stanzas separated by blank lines
+stanzas :: [String] -> [[String]]
+stanzas ls = case dropWhile (all isSpace) ls of
+  []  -> []
+  wls -> case break (all isSpace) wls of
+    (s,ss) -> s : stanzas ss
