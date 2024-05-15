@@ -441,7 +441,7 @@ chkNprsUDText text =
     if null $ rights results then
       Left $ lefts results
     else
-      Right $ map unwords $ rights results
+      Right $ map unlines $ rights results
 
 -- | Predicate that checks if a 'String' is a general comment, i.e., if it starts with ##
 isGeneralComment :: String -> Bool
