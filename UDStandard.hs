@@ -128,6 +128,9 @@ rootID = UDIdInt 0
 -- | Universal POS tag (fourth column of a CoNNL-U file)
 type UPOS = String
 
+-- | Only for backwards compatibility
+type POS = UPOS
+
 checkUPOS :: String -> [String]
 checkUPOS = checkInList "UD Pos tag" (map fst allUPOSs)
 
