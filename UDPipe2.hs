@@ -17,7 +17,8 @@ module UDPipe2 where
 import GHC.Generics
 import Data.ByteString.Lazy.UTF8 (fromString)
 import Network.Curl
-import Data.Aeson
+import Network.URI.Encode (encode)
+import Data.Aeson hiding (encode)
 import UDStandard
 
 -- | UDPipe model name, such as "swedish-talbanken-ud-2.12-230717" (see
@@ -68,7 +69,6 @@ annotateText s f m (tk,tko) (tg,tgo) (pr,pro) = do
   (code,str) <- curlGetString
     "http://lindat.mff.cuni.cz/services/udpipe/api/process"
     [CurlPost True, CurlPostFields fields]
-  --error $ show fields
   if code /= CurlOK
     then error $ "Failed to use the UDPipe 2 API. curl code: " ++ show code
     else do
@@ -78,7 +78,7 @@ annotateText s f m (tk,tko) (tg,tgo) (pr,pro) = do
         Just json -> do
           return $ prsUDText (result json)
   where
-    fields = ["data=" ++ s, "model=" ++ m, "input=" ++ show f]
+    fields = ["data=" ++ encode s, "model=" ++ m, "input=" ++ show f]
           ++ (if tk || f == Plain then ["tokenizer=" ++ tko] else [])
           ++ (if tg then ["tagger=" ++ tgo] else [])
           ++ (if pr then ["parser=" ++ pro] else [])
