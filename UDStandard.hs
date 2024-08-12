@@ -47,7 +47,7 @@ class UDObject a where
   check :: a -> Either a [ErrorMsg] 
   check x = case errors x of 
     [] -> Left x ; 
-    ss -> Right (("ERROR in " ++ prt x ++ ": ") : ss)
+    ss -> Right (("error(s) in sentence\n\n" ++ prt x ++ "\n\n ") : ss)
 
 -- | Instance for all pipe-separated lists 
 -- (e.g. FEATS field of a CoNNL-U file)
