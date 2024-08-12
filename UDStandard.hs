@@ -135,7 +135,7 @@ type UPOS = String
 type POS = UPOS
 
 checkUPOS :: String -> [String]
-checkUPOS = checkInList "UD Pos tag" (map fst allUPOSs)
+checkUPOS = checkInList "UPOS tag" (map fst allUPOSs)
 
 -- | Complete list of UPOS tags paired with explanations. Used for validation
 allUPOSs :: [(String,String)]
