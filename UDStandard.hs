@@ -15,6 +15,7 @@ module UDStandard where
 import Data.List
 import Data.List.Split
 import Data.Char
+import Data.Either
 
 import Utils
 
@@ -22,6 +23,8 @@ import Utils
 -- $ 
 -- UD sentences, word tokens, token IDs and other CoNNL-U fields are all 
 -- UD objects than can be printed, parsed and validated
+
+type ErrorMsg = String
 
 -- | Typeclass for all UD objects 
 class UDObject a where
@@ -37,11 +40,11 @@ class UDObject a where
   prss ss = prs (unlines ss)
 
   -- | Return a list of CoNLL-U format errors
-  errors :: a -> [String]
+  errors :: a -> [ErrorMsg]
   errors _ = []
 
   -- | Check and return either the checked object or a list of format errors
-  check :: a -> Either a [String] 
+  check :: a -> Either a [ErrorMsg] 
   check x = case errors x of 
     [] -> Left x ; 
     ss -> Right (("ERROR in " ++ prt x ++ ": ") : ss)
@@ -427,9 +430,29 @@ prsUDFile f = readFile f >>= return . prsUDText
 -- | Parse a CoNNL-U string as a list of 'UDSentence's
 prsUDText :: String -> [UDSentence]
 prsUDText = map prss . stanzas . filter (not . isGeneralComment) . lines
-  where 
-    isGeneralComment line = "##" `isPrefixOf` line
-    stanzas ls = case dropWhile (all isSpace) ls of
-      []  -> []
-      wls -> case break (all isSpace) wls of
-        (s,ss) -> s : stanzas ss
+
+-- | Check and parse a CoNNL-U file. Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
+chkNprsUDFile :: FilePath -> IO (Either [UDSentence] [ErrorMsg])
+chkNprsUDFile f = readFile f >>= return . chkNprsUDText
+
+-- | Check and parse a CoNNL-U string. Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
+chkNprsUDText :: String -> Either [UDSentence] [ErrorMsg]
+chkNprsUDText text =
+  let
+    results = map check . map (prss :: [String] -> UDSentence) . stanzas . filter (not . isGeneralComment) . lines $ text
+  in
+    if null $ rights results then
+      Left $ lefts results
+    else
+      Right $ map unlines $ rights results
+
+-- | Predicate that checks if a 'String' is a general comment, i.e., if it starts with ##
+isGeneralComment :: String -> Bool
+isGeneralComment line = "##" `isPrefixOf` line
+
+-- | Splits a list of lines into a list of stanzas separated by blank lines
+stanzas :: [String] -> [[String]]
+stanzas ls = case dropWhile (all isSpace) ls of
+  []  -> []
+  wls -> case break (all isSpace) wls of
+    (s,ss) -> s : stanzas ss
