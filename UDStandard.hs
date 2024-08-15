@@ -31,23 +31,19 @@ class UDObject a where
   -- | Print in CoNLL-U format
   prt  :: a -> String
   
-  -- | Parse from CoNLL-U
-  prs  :: String -> a 
+  -- | Parse from CoNLL-U. Return either the parsed object or a list of parse 
+  -- errors
+  prs  :: String -> Either a [ErrorMsg] 
   prs s = prss [s]
   
   -- | Parse from multiple separate (CoNLL-U) lines
-  prss :: [String] -> a
+  prss :: [String] -> Either a [ErrorMsg]
   prss ss = prs (unlines ss)
 
-  -- | Return a list of CoNLL-U format errors
+  -- | Return a list of CoNLL-U format errors coming from additional (i.e. 
+  -- post-parse errors, such as "invalid UPOS tag")
   errors :: a -> [ErrorMsg]
   errors _ = []
-
-  -- | Check and return either the checked object or a list of format errors
-  check :: a -> Either a [ErrorMsg] 
-  check x = case errors x of 
-    [] -> Left x ; 
-    ss -> Right (("error(s) in sentence\n\n" ++ prt x ++ "\n\n ") : ss)
 
 -- | Instance for all pipe-separated lists 
 -- (e.g. FEATS field of a CoNNL-U file)
@@ -56,8 +52,10 @@ instance UDObject d => UDObject [d] where
     [] -> "_" 
     _ -> concat (intersperse "|" (map prt ds))
   prs s = case (strip s) of
-    "_" -> []
-    _ -> map (prs . strip) (getSeps '|' s)
+    "_" -> Left []
+    _ -> 
+      let xs = map (prs . strip) (getSeps '|' s)
+      in if all isLeft xs then Left $ lefts xs else Right $ concat $ rights xs
   errors ds = concatMap errors ds
 
 -- * CoNNL-U fields
@@ -99,13 +97,13 @@ instance UDObject UDId where
     UDIdEmpty f -> show f
     UDIdNone -> "_"
   prs s = case (strip s) of
-    "0" -> rootID
-    "_" -> UDIdNone
-    _ | all isDigit s -> UDIdInt (read s)
+    "0" -> Left $ rootID
+    "_" -> Left $ UDIdNone
+    _ | all isDigit s -> Left $ UDIdInt (read s)
     _ -> case break (flip elem ".-") s of
-      (a,'-':b@(_:_)) | all isDigit (a++b) -> UDIdRange (read a) (read b)
-      (a,'.':b@(_:_)) | all isDigit (a++b) -> UDIdEmpty (read s)
-      _ -> error ("ERROR:" ++ s ++ " invalid UDId")
+      (a,'-':b@(_:_)) | all isDigit (a++b) -> Left $ UDIdRange (read a) (read b)
+      (a,'.':b@(_:_)) | all isDigit (a++b) -> Left $ UDIdEmpty (read s)
+      _ -> Right $ ["ERROR: invalid ID in\n\n" ++ s]
 
 -- | Convert an integer into an `UDId`
 int2id :: Int -> UDId
@@ -177,8 +175,8 @@ data UDData = UDData {
 instance UDObject UDData where
   prt d = udArg d ++ "=" ++ concat (intersperse "," (udVals d))
   prs s = case break (=='=') (strip s) of
-    (a,_:vs@(_:_)) -> UDData a (getSepsEsc ',' vs) 
-    (a,_) -> UDData a []
+    (a,_:vs@(_:_)) -> Left $ UDData a (getSepsEsc ',' vs) 
+    (a,_) -> Left $ UDData a []
 
 -- ** DEPREL
 
@@ -258,25 +256,24 @@ data UDWord = UDWord {
   udMISC   :: [UDData]  -- ^ any other annotation
   } deriving (Show,Eq,Ord)
 
-instance Read UDWord where
-  readsPrec _ s = [(prs s :: UDWord, "")]
+-- TODO:
+--instance Read UDWord where
+--  readsPrec _ s = [(prs s :: UDWord, "")]
 
 instance UDObject UDWord where
   prt w = intercalate "\t" $ prUDWordParts w
   prs s = case getSeps '\t' (strip s) of
     id:fo:le:up:xp:fe:he:de:ds:mi:_ ->
-      UDWord 
-        (prs $ strip id) 
-        fo 
-        le 
-        up 
-        xp 
-        (prs $ strip fe) 
-        (prs $ strip he) 
-        de 
-        ds 
-        (prs $ strip mi) 
-    _ -> error ("ERROR: " ++ s ++ " incomplete UDWord")
+      let us = map (prs . strip) [id, fe, he, mi]
+      in if all isLeft us  
+          then let
+            [uid, ufe, uhe, umi] = lefts us
+            w = UDWord uid fo le up xp ufe uhe de ds umi 
+          in case errors w of 
+            [] -> Left w
+            es -> Right es
+          else Right $ concat $ rights us
+    _ -> Right ["ERROR: incomplete line in\n\n" ++ s]
   errors w@(UDWord id fo le up xp fe he de ds mi) =
     concat [
       errors id, 
@@ -287,7 +284,7 @@ instance UDObject UDWord where
       errors mi] ++ case w of
       _ | not   ((udHEAD w /= rootID || udDEPREL w == "root") 
              && (udHEAD w == rootID || udDEPREL w /= "root"))
-          -> ["root iff 0 does not hold in:",prt w]
+          -> ["ERROR: DEPREL==root iff ID==0 does not hold in:\n\n",prt w]
       _ -> []
 
 -- | Shorthand to create an "empty" UDWord with an integer ID
@@ -319,7 +316,14 @@ instance Show UDSentence where
 instance UDObject UDSentence where
   prt s = prtReducedUDSentence "xxxxxxxxxx" s
   prss ss = case span ((=="#") . take 1) ss of
-    (cs,ws) -> UDSentence cs (map (prs . strip) ws)
+    (cs,ws) -> 
+      let uws = map (prs . strip) ws
+      in if all isLeft uws then 
+        let s = UDSentence cs (lefts uws)
+        in case errors s of 
+          [] -> Left s
+          es -> Right es
+        else Right $ concat $ rights uws
   errors s = checkUDWords (udWordLines s)
     where 
       checkUDWords ws = concatMap errors ws ++ case ws of
@@ -371,13 +375,16 @@ prtSimplifiedUDSentence = prtReducedUDSentence "xxxx__xx__"
 
 -- | Parse a reduced CoNNL-U sentence. Requires a 'PrintPattern' specifying
 -- what fields are omitted
-prsReducedUDSentence :: PrintPattern -> [String] -> UDSentence
-prsReducedUDSentence parts givens = UDSentence {
-  udCommentLines = cs,
-  udWordLines = map ((completeReducedUDWord parts) . words) ws 
-  }
+prsReducedUDSentence :: PrintPattern -> [String] -> Either UDSentence [ErrorMsg]
+prsReducedUDSentence parts givens = if all isLeft cws 
+  then Left $ UDSentence {
+                udCommentLines = cs,
+                udWordLines = lefts cws
+                }
+  else Right $ concat $ rights cws
  where 
   (cs,ws) = break ((/="#") . take 1) givens
+  cws = (map ((completeReducedUDWord parts) . words) ws)
   completeReducedUDWord parts = 
     prs . concat .  (intersperse "\t") . complete pattern
     where
@@ -390,7 +397,7 @@ prsReducedUDSentence parts givens = UDSentence {
 -- | Shorthand for parsing simplified CoNNL-U without explicitly providing 
 -- the corresponding 'PrintPattern' (equivalent to 
 -- 'prsReducedUDSentence '"xxxx\_\_xx\_\_"')
-prsSimplifiedUDSentence :: String -> UDSentence
+prsSimplifiedUDSentence :: String -> Either UDSentence [ErrorMsg]
 prsSimplifiedUDSentence = prss . map completeUDWord . getSeps ";" . words
  where
   completeUDWord ws = case ws of
@@ -423,23 +430,17 @@ ud2posfeatswords s = unwords
 
 -- * Parsing full CoNNL-U files
 
--- | Parse a CoNNL-U file as a list of 'UDSentence's
-prsUDFile :: FilePath -> IO [UDSentence]
+-- | Parse a CoNNL-U file. 
+-- Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
+prsUDFile :: FilePath -> IO (Either [UDSentence] [ErrorMsg])
 prsUDFile f = readFile f >>= return . prsUDText
 
--- | Parse a CoNNL-U string as a list of 'UDSentence's
-prsUDText :: String -> [UDSentence]
-prsUDText = map prss . stanzas . filter (not . isGeneralComment) . lines
-
--- | Check and parse a CoNNL-U file. Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
-chkNprsUDFile :: FilePath -> IO (Either [UDSentence] [ErrorMsg])
-chkNprsUDFile f = readFile f >>= return . chkNprsUDText
-
--- | Check and parse a CoNNL-U string. Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
-chkNprsUDText :: String -> Either [UDSentence] [ErrorMsg]
-chkNprsUDText text =
+-- | Parse a CoNNL-U string. 
+-- Returns either a list of 'UDSentence's or a list of 'ErrorMsg'
+prsUDText :: String -> Either [UDSentence] [ErrorMsg]
+prsUDText text =
   let
-    results = map check . map (prss :: [String] -> UDSentence) . stanzas . filter (not . isGeneralComment) . lines $ text
+    results = map prss . stanzas . filter (not . isGeneralComment) . lines $ text
   in
     if null $ rights results then
       Left $ lefts results
