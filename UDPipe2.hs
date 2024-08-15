@@ -15,6 +15,7 @@ Automatic UD annotation via the
 module UDPipe2 where
 
 import GHC.Generics
+import Data.Either
 import Data.ByteString.Lazy.UTF8 (fromString)
 import Network.Curl
 import Network.URI.Encode (encode)
@@ -76,7 +77,12 @@ annotateText s f m (tk,tko) (tg,tgo) (pr,pro) = do
         Nothing -> 
           error $ "Got a malformed response string from UDPipe 2: " ++ str
         Just json -> do
-          return $ prsUDText (result json)
+          let prsRes = prsUDText (result json)
+          if isLeft prsRes -- it better be, cause it comes from a parser!
+            then return $ fromLeft [] prsRes 
+            else do 
+              mapM_ putStrLn (fromRight [] prsRes) 
+              return []
   where
     fields = ["data=" ++ encode s, "model=" ++ m, "input=" ++ show f]
           ++ (if tk || f == Plain then ["tokenizer=" ++ tko] else [])

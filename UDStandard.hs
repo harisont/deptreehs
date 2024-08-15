@@ -262,17 +262,40 @@ data UDWord = UDWord {
 
 instance UDObject UDWord where
   prt w = intercalate "\t" $ prUDWordParts w
+  -- the code below is obnoxious but idk how to do it in a better way (see 
+  -- comments)
   prs s = case getSeps '\t' (strip s) of
     id:fo:le:up:xp:fe:he:de:ds:mi:_ ->
-      let us = map (prs . strip) [id, fe, he, mi]
-      in if all isLeft us  
-          then let
-            [uid, ufe, uhe, umi] = lefts us
-            w = UDWord uid fo le up xp ufe uhe de ds umi 
-          in case errors w of 
-            [] -> Left w
-            es -> Right es
-          else Right $ concat $ rights us
+      let 
+        -- can't map prs . strip because that would try to parse all as UDId
+        uid = prs $ strip id :: Either UDId [ErrorMsg]
+        ufe = prs $ strip fe :: Either [UDData] [ErrorMsg]
+        uhe = prs $ strip he :: Either UDId [ErrorMsg]
+        umi = prs $ strip mi :: Either [UDData] [ErrorMsg]
+      -- can't do all isLeft (lefts xs) because types are now different
+      in if and [isLeft uid, isLeft ufe, isLeft uhe, isLeft umi]  
+          then 
+            let w = UDWord 
+                        (fromLeft UDIdNone uid)
+                        fo 
+                        le 
+                        up 
+                        xp 
+                        (fromLeft [] ufe) 
+                        (fromLeft UDIdNone uhe) 
+                        de 
+                        ds 
+                        (fromLeft [] umi) 
+            in case errors w of 
+              [] -> Left w
+              es -> Right es
+          -- again can't map (fromRight []) because the Eithers have different
+          -- left-types
+          else Right $ 
+                fromRight [] uid 
+             ++ fromRight [] ufe 
+             ++ fromRight [] uhe 
+             ++ fromRight [] umi
     _ -> Right ["ERROR: incomplete line in\n\n" ++ s]
   errors w@(UDWord id fo le up xp fe he de ds mi) =
     concat [

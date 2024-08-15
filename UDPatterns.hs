@@ -18,6 +18,7 @@ module UDPatterns where
 import Data.Data
 import Data.Maybe (listToMaybe)
 import Data.List (intercalate)
+import Data.Either
 
 import Utils
 import UDStandard
@@ -79,9 +80,9 @@ matchesPattern patt tree@(RTree node subtrees) = case patt of
     (matchString s) $ listToMaybe 
       [intercalate "," vals | 
        UDData arg vals <- udMISC node , arg == name]
-  FEATS udds -> udFEATS node == prs udds
+  FEATS udds -> udFEATS node == fromLeft [] (prs udds)
   FEATS_ udds -> 
-    let uddlist = prs udds in
+    let uddlist = fromLeft [] (prs udds) in
     or [fs == uddlist | fs <- sublists (length uddlist) (udFEATS node)]
   DEPREL s -> matchString s (udDEPREL node)
   DEPREL_ s -> matchString s (takeWhile (/=':') (udDEPREL node))
@@ -187,9 +188,9 @@ replaceWithUDPattern rep tree@(RTree node subtrs) = case rep of
   REPLACE_DEPREL_ old new | matchesPattern (DEPREL_ old) tree -> 
     true $ tree{root = node{udDEPREL = new}}
   REPLACE_FEATS old new | matchesPattern (FEATS old) tree -> 
-    true $ tree{root = node{udFEATS = prs new}}
+    true $ tree{root = node{udFEATS = fromLeft [] (prs new)}}
   REPLACE_FEATS_ old new | matchesPattern (FEATS_ old) tree -> true $
-    let news = [(udArg fv, udVals fv) | fv <- prs new] in
+    let news = [(udArg fv, udVals fv) | fv <- fromLeft [] (prs new)] in
     tree {
       root = node {
         udFEATS = [maybe fv (\v -> fv{udVals = v}) (lookup (udArg fv) news) 
