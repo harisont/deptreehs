@@ -88,7 +88,7 @@ data UDId =
   | UDIdRange Int Int   -- ^ multiword (e.g. "don't"): the ID is a range X-Y
   | UDIdEmpty Float     -- ^ empty node: the ID is a float > 0  
   | UDIdNone            -- ^ missing ID (_)
-   deriving (Eq,Ord,Show)
+   deriving (Eq,Ord,Read,Show)
 
 instance UDObject UDId where
   prt i = case i of
@@ -170,7 +170,7 @@ data UDData = UDData {
   udArg  :: String, -- ^ argument name
   udVals ::[String] -- ^ values
   }
-   deriving (Eq,Show,Ord)
+   deriving (Eq,Read,Show,Ord)
 
 instance UDObject UDData where
   prt d = udArg d ++ "=" ++ concat (intersperse "," (udVals d))
@@ -254,7 +254,7 @@ data UDWord = UDWord {
   udDEPREL :: Label,    -- ^ dependency label
   udDEPS   :: String,   -- ^ enhanced dependency graph
   udMISC   :: [UDData]  -- ^ any other annotation
-  } deriving (Show,Eq,Ord)
+  } deriving (Read,Show,Eq,Ord)
 
 -- TODO:
 --instance Read UDWord where
