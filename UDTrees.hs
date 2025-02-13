@@ -28,9 +28,12 @@ sentence2tree :: UDSentence -> UDTree
 sentence2tree s = s2t rootWord where
   s2t hd = RTree hd [s2t w | w <- ws, udHEAD w == udID hd]
   rootWord =
-    case [w | w <- ws, udDEPREL w == "root"] of -- unique if check succeeds
+    case [w | w <- ws, udHEAD w == rootID] of -- unique if check succeeds
       x:_ -> x
-      []  -> error $ "sentence2tree: sentence " ++ prt s ++ "has no as root" 
+      []  -> error $ 
+              "sentence2tree: root word expected to have " 
+              ++ show rootID ++ " as root, got instead\n" 
+              ++ (prt (UDSentence [] ws))
   ws = udWordLines s
 
 -- | Convert a 'UDTree' into a 'UDSentence' 
