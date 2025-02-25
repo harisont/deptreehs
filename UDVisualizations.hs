@@ -109,11 +109,15 @@ visual2latex d =
     [Put (wpos rwld i,0) (Text w) | (i,w) <- zip [0..] (map fst (tokens d))]   -- words
   ++ [Put (wpos rwld i,15) (TinyText w) | (i,(w,_)) <- zip [0..] (map snd (tokens d))]   -- pos tags 15u above bottom
 ---  ++ [Put (wpos rwld i,-15) (TinyText w) | (i,(_,w)) <- zip [0..] (map snd (tokens d))]   -- features 15u below bottom -> DON'T SHOW
-  ++ concat [putArc rwld (aheight x y) x y label | ((x,y),label) <- deps d]    -- arcs and labels
-  ++ [Put (wpos rwld (root d) + 15,height) (ArrowDown (height-arcbase))]
-  ++ [Put (wpos rwld (root d) + 20,height - 10) (TinyText "root")]
+  ++ concat leftDeps -- arcs and labels
+  ++ [Put (wpos rwld r + 15,height) (ArrowDown (height-arcbase))]
+  ++ [Put (wpos rwld r + 20,height - 10) (TinyText "root")]
+  ++ concat rightDeps
   )]
  where
+  r = root d
+  -- split into deps at the left & right of the root so that deps are in the same order as words and pos
+  (leftDeps,rightDeps) = splitAt r [putArc rwld (aheight x y) x y label | ((x,y),label) <- deps d]
   wld = wordLength d  -- >= 20.0
   rwld i = wld i / defaultWordLength       -- >= 1.0
   aheight x y = depth (min x y) (max x y) + 1    ---- abs (x-y)
